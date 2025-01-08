@@ -1,0 +1,16 @@
+--------- Report ---------
+Company: Alpha Freight (id: 187)
+Report for the period: 2025-01-01 - 2025-01-31
+
+Total Revenue (in period): 0.0
+Total Transports (in period): 0
+
+Vehicles:
+  - TANKER, 'SF9876CD'
+
+Clients:
+  - Stefan Georgiev, 'stefan@example.com'
+
+Employees:
+  - Petar Petrov, salary:3200.0
+-----------------------------

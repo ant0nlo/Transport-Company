@@ -1,0 +1,16 @@
+--------- Report ---------
+Company: YRC Worldwide (id: 388)
+Report for the period: 2025-01-01 - 2025-01-31
+
+Total Revenue (in period): 30000.0
+Total Transports (in period): 1
+
+Vehicles:
+  - MILITARY_VEHICLE, 'SF54321EF'
+
+Clients:
+  - Viktor Ivanov, 'viktor@example.com'
+
+Employees:
+  - Vasil Vasilev, salary:4000.0
+-----------------------------

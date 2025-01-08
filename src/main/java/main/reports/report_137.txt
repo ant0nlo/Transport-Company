@@ -1,0 +1,13 @@
+--------- Report ---------
+Company: Test Company (id: 137)
+Report for the period: 2025-01-01 - 2025-01-31
+
+Total Revenue (in period): 0.0
+Total Transports (in period): 0
+
+Vehicles:
+
+Clients:
+
+Employees:
+-----------------------------

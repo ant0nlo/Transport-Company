@@ -1,0 +1,5 @@
+TransportDTO{transportId=11, startLocation='Sofia', endLocation='Plovdiv', departureDate='2024-11-01', arrivalDate='2024-11-01', cargoDescription='Furniture', cargoWeight=500.0, price=1000.0, isPaid=true}
+TransportDTO{transportId=12, startLocation='Sofia', endLocation='Plovdiv', departureDate='2024-11-01', arrivalDate='2024-11-01', cargoDescription='Furniture', cargoWeight=500.0, price=1000.0, isPaid=true}
+TransportDTO{transportId=13, startLocation='Sofia', endLocation='Plovdiv', departureDate='2024-11-01', arrivalDate='2024-11-01', cargoDescription='Furniture', cargoWeight=500.0, price=1000.0, isPaid=true}
+TransportDTO{transportId=14, startLocation='Sofia', endLocation='Plovdiv', departureDate='2024-11-01', arrivalDate='2024-11-01', cargoDescription='Furniture', cargoWeight=500.0, price=1000.0, isPaid=true}
+TransportDTO{transportId=20, startLocation='Sofia', endLocation='Plovdiv', departureDate='2024-11-01', arrivalDate='2024-11-01', cargoDescription='Furniture', cargoWeight=500.0, price=1000.0, isPaid=true}

@@ -1,0 +1,16 @@
+--------- Report ---------
+Company: AlphaTrans (id: 185)
+Report for the period: 2025-01-01 - 2025-01-31
+
+Total Revenue (in period): 40000.0
+Total Transports (in period): 2
+
+Vehicles:
+  - VAN, 'SF1234AB'
+
+Clients:
+  - Ivan Ivanov, 'ivan@example.com'
+
+Employees:
+  - Dimitar Dimitrov, salary:3000.0
+-----------------------------

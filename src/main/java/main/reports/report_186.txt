@@ -1,0 +1,17 @@
+--------- Report ---------
+Company: Logistics (id: 186)
+Report for the period: 2025-01-01 - 2025-01-31
+
+Total Revenue (in period): 12000.0
+Total Transports (in period): 2
+
+Vehicles:
+  - VAN, 'SF5678AB'
+
+Clients:
+  - Maria Petrova, 'maria@example.com'
+
+Employees:
+  - Kiril Kirilov, salary:2800.0
+  - Georgi Stoyanov, salary:2500.0
+-----------------------------

@@ -1,0 +1,16 @@
+--------- Report ---------
+Company: MyCompany (id: 184)
+Report for the period: 2025-01-01 - 2025-01-31
+
+Total Revenue (in period): 25000.0
+Total Transports (in period): 3
+
+Vehicles:
+  - VAN, 'SF499365AB'
+
+Clients:
+  - Stefan, 'Stefan@example.com'
+
+Employees:
+  - G. Petrov, salary:2000.0
+-----------------------------

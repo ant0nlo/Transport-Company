@@ -1,0 +1,16 @@
+--------- Report ---------
+Company: Test5 (id: 171)
+Report for the period: 2025-01-01 - 2025-01-31
+
+Total Revenue (in period): 0.0
+Total Transports (in period): 0
+
+Vehicles:
+  - MILITARY_VEHICLE, 'SF44075AB'
+
+Clients:
+  - Ivan, 'ivan@example.com'
+
+Employees:
+  - D. Ivanov, salary:3000.0
+-----------------------------
