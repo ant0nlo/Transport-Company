@@ -106,6 +106,21 @@ public class VehicleDaoTest {
         assertEquals(2, allVehicles.size());
     }
 
+    @Test
+    void testGetVehicleByRegistrationNumber() {
+        // First, create a vehicle to retrieve
+        VehicleDTO newVehicleDTO = new VehicleDTO(VehicleType.BUS, 50, "BUS1234", Qualification.PASSENGERS_12_PLUS);
+        vehicleDAO.createVehicle(newVehicleDTO, companyId);
+
+        VehicleDTO retrievedVehicle = vehicleDAO.getVehicleByRegistrationNumber("BUS1234");
+        assertNotNull(retrievedVehicle, "Vehicle should be retrieved successfully.");
+        assertEquals("BUS1234", retrievedVehicle.getRegistrationNumber(), "Registration number should match.");
+
+        // Test retrieving a non-existent vehicle
+        VehicleDTO nullVehicle = vehicleDAO.getVehicleByRegistrationNumber("NONEXISTENT123");
+        assertNull(nullVehicle, "No vehicle should be found with a non-existent registration number.");
+    }
+
     @AfterAll
     public void tearDown() {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {

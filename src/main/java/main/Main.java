@@ -11,6 +11,7 @@ public class Main {
     public static void main(String[] args) {
 
         try {
+
             CompanyDTO companyDTO = new CompanyDTO("Delta Transports", "Sofia, Bulgaria", BigDecimal.valueOf(10000));
             CompanyDAO companyDAO = new CompanyDAO();
             Long companyId = companyDAO.createCompany(companyDTO);
@@ -86,7 +87,9 @@ public class Main {
             System.out.println("Total Revenue By Driver: " + transportDAO.getTotalRevenueByDriver(employeeId));
             System.out.println("=========================\n");
 
-           // CompanyDAO companyDAO = new CompanyDAO();
+
+
+            //CompanyDAO companyDAO = new CompanyDAO();
             companyDAO.saveCompanyReportToFile(389L, "src/main/java/main/reports/", "2024-01-12", "2025-01-31");
 
             /*
@@ -100,8 +103,18 @@ public class Main {
             System.out.println("Employees: " + companyReport.get("employees"));
              */
 
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
+            System.err.println("An unexpected error occurred: " + e.getMessage());
             e.printStackTrace();
+
+            // Ако има специфичен изключителен случай, можеш да добавиш проверки:
+            Throwable cause = e.getCause();
+            while (cause != null) {
+                System.err.println("Caused by: " + cause.getMessage());
+                cause.printStackTrace();
+                cause = cause.getCause();
+            }
         }
     }
 }

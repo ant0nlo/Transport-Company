@@ -4,9 +4,12 @@ import main.dto.*;
 import main.entity.Client;
 import main.configuration.HibernateUtil;
 import main.entity.*;
+import main.exception.EntityNotFoundException;
+import main.exception.DatabaseOperationException;
 import main.mapper.ClientMapper;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -16,10 +19,9 @@ public class ClientDAO {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             Transaction transaction = session.beginTransaction();
 
-            // Извличаме компанията спрямо ID-то
             Company company = session.get(Company.class, companyId);
             if (company == null) {
-                throw new IllegalArgumentException("Company with ID " + companyId + " does not exist.");
+                throw new EntityNotFoundException("Company with ID " + companyId + " does not exist.");
             }
 
             Client client = ClientMapper.toEntity(clientDTO);
@@ -27,16 +29,22 @@ public class ClientDAO {
             Long clientId = (Long) session.save(client);
             transaction.commit();
             return clientId;
+        } catch (Exception e) {
+            throw new DatabaseOperationException("Failed to create client.", e);
         }
     }
 
     public ClientDTO getClient(Long clientId) {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             Client client = session.get(Client.class, clientId);
-            if (client == null || client.isDeleted()) { // Проверка за isDeleted
-                throw new IllegalArgumentException("Client with ID " + clientId + " does not exist or is deleted.");
+            if (client == null || client.isDeleted()) {
+                throw new EntityNotFoundException("Client with ID " + clientId + " does not exist or is deleted.");
             }
             return ClientMapper.toDTO(client);
+        } catch (EntityNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new DatabaseOperationException("Failed to retrieve client with ID " + clientId, e);
         }
     }
 
@@ -46,6 +54,8 @@ public class ClientDAO {
             return clients.stream()
                     .map(ClientMapper::toDTO)
                     .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new DatabaseOperationException("Failed to retrieve all clients.", e);
         }
     }
 
@@ -55,12 +65,14 @@ public class ClientDAO {
 
             Client existingClient = session.get(Client.class, clientId);
             if (existingClient == null || existingClient.isDeleted()) {
-                throw new IllegalArgumentException("Client with ID " + clientId + " does not exist.");
+                throw new EntityNotFoundException("Client with ID " + clientId + " does not exist or is deleted.");
             }
 
             ClientMapper.updateEntityFromDTO(clientDTO, existingClient);
             session.update(existingClient);
             transaction.commit();
+        } catch (Exception e) {
+            throw new DatabaseOperationException("Failed to update client with ID " + clientId, e);
         }
     }
 
@@ -70,12 +82,14 @@ public class ClientDAO {
 
             Client client = session.get(Client.class, clientId);
             if (client == null || client.isDeleted()) {
-                throw new IllegalArgumentException("Client with ID " + clientId + " does not exist or is already deleted.");
+                throw new EntityNotFoundException("Client with ID " + clientId + " does not exist or is already deleted.");
             }
             client.setDeleted(true);
             session.update(client);
 
             transaction.commit();
+        } catch (Exception e) {
+            throw new DatabaseOperationException("Failed to delete client with ID " + clientId, e);
         }
     }
 }

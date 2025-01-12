@@ -24,6 +24,7 @@ public class EmployeeDaoTest {
     private EmployeeDAO employeeDAO;
     private Long companyId;
 
+
     @BeforeAll
     public void setUpDatabase() {
         employeeDAO = new EmployeeDAO();

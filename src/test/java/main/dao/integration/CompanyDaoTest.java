@@ -235,7 +235,7 @@ public class CompanyDaoTest {
 
             session.getTransaction().commit();
         }
-        HibernateUtil.shutdown();
+        //HibernateUtil.shutdown();
     }
 
 

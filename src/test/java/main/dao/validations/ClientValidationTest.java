@@ -46,8 +46,10 @@ public class ClientValidationTest {
 
         Set<ConstraintViolation<Client>> violations = validator.validate(client);
 
-        assertTrue(violations.iterator().next().getMessage().contains("Name cannot be empty"));
-    }
+        boolean hasNotBlankError = violations.stream()
+                .anyMatch(v -> v.getMessage().contains("Name cannot be empty"));
+
+        assertTrue(hasNotBlankError, "Expected @NotBlank message to be present among the violations.");    }
 
     @Test
     public void testClientNameTooShort() {

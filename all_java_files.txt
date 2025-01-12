@@ -1,0 +1,3777 @@
+package main.dao.integration;
+
+import main.configuration.HibernateUtil;
+import main.dao.CompanyDAO;
+import main.dao.VehicleDAO;
+import main.dto.CompanyDTO;
+import main.dto.VehicleDTO;
+import main.entity.VehicleType;
+import main.entity.Qualification;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import org.junit.jupiter.api.*;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class VehicleDaoTest {
+
+    private VehicleDAO vehicleDAO;
+    private CompanyDAO companyDAO;
+    private Long companyId;
+
+    @BeforeAll
+    public void setUp() {
+        vehicleDAO = new VehicleDAO();
+        companyDAO = new CompanyDAO();
+
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            CompanyDTO testCompany = new CompanyDTO("Test Company", "123 Main Street", BigDecimal.valueOf(100000));
+            companyId = companyDAO.createCompany(testCompany);
+
+            transaction.commit();
+        }
+    }
+
+    @AfterEach
+    void delPrevious() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            session.beginTransaction();
+            // Обновяваме всички служители с isDeleted = false на true
+            session.createQuery("UPDATE Vehicle SET isDeleted = true WHERE isDeleted = false").executeUpdate();
+            session.getTransaction().commit();
+        }
+    }
+
+    @Test
+    void testCreateVehicle() {
+        VehicleDTO vehicleDTO = new VehicleDTO(VehicleType.BUS, 4, "TEST123", Qualification.PASSENGERS_12_PLUS);
+        Long vehicleId = vehicleDAO.createVehicle(vehicleDTO, companyId);
+        assertNotNull(vehicleId, "Vehicle should be created successfully.");
+    }
+
+    @Test
+    void testGetVehicle() {
+        VehicleDTO vehicleDTO = new VehicleDTO(VehicleType.BUS, 4, "TEST1231", Qualification.PASSENGERS_12_PLUS);
+
+        Long vehicleId = vehicleDAO.createVehicle(vehicleDTO, companyId);
+        VehicleDTO fetchedVehicleDTO = vehicleDAO.getVehicle(vehicleId);
+
+        assertNotNull(fetchedVehicleDTO, "Vehicle should be fetched successfully.");
+        assertEquals("TEST1231", fetchedVehicleDTO.getRegistrationNumber(), "Registration number should match.");
+    }
+
+    @Test
+    void testUpdateVehicle() {
+        VehicleDTO vehicleDTO = new VehicleDTO(VehicleType.BUS, 12, "1234", Qualification.PASSENGERS_12_PLUS);
+
+        Long vehicleId = vehicleDAO.createVehicle(vehicleDTO, companyId);
+
+        VehicleDTO updatedVehicleDTO = new VehicleDTO(VehicleType.BUS, 12, "4321", Qualification.PASSENGERS_12_PLUS);
+
+        vehicleDAO.updateVehicle(updatedVehicleDTO, vehicleId);
+
+        assertNotNull(updatedVehicleDTO, "Vehicle should be updated.");
+        assertEquals("4321", vehicleDAO.getVehicle(vehicleId).getRegistrationNumber(), "Updated registration number should match.");
+    }
+
+    @Test
+    void testDeleteVehicle() {
+        VehicleDTO vehicleDTO = new VehicleDTO(VehicleType.BUS, 12, "32234", Qualification.PASSENGERS_12_PLUS);
+        Long vehicleId = vehicleDAO.createVehicle(vehicleDTO, companyId);
+        vehicleDAO.deleteVehicle(vehicleId);
+
+        // Опитваме да вземем изтритото превозно средство и проверяваме дали се хвърля изключение
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            vehicleDAO.getVehicle(vehicleId);
+        });
+
+        assertTrue(exception.getMessage().contains("Vehicle with ID " + vehicleId + " does not exist or is deleted"));
+    }
+
+    @Test
+    void testGetAllVehicles() {
+        VehicleDTO vehicleDTO1 = new VehicleDTO(VehicleType.BUS, 12, "2334", Qualification.PASSENGERS_12_PLUS);
+        vehicleDAO.createVehicle(vehicleDTO1, companyId);
+
+        VehicleDTO vehicleDTO2 = new VehicleDTO(VehicleType.CAR, 5, "3334", null);
+        vehicleDAO.createVehicle(vehicleDTO2, companyId);
+
+        List<VehicleDTO> allVehicles = vehicleDAO.getAllVehicles();
+        assertEquals(2, allVehicles.size());
+    }
+
+    @AfterAll
+    public void tearDown() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            session.createQuery("DELETE FROM Vehicle").executeUpdate();
+            session.createQuery("DELETE FROM Company").executeUpdate();
+
+            session.flush();
+            transaction.commit();
+        }
+    }
+}package main.dao.integration;
+
+import main.configuration.HibernateUtil;
+import main.dao.CompanyDAO;
+import main.dao.EmployeeDAO;
+import main.dto.EmployeeDTO;
+import main.entity.Qualification;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import org.junit.jupiter.api.*;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Set;
+
+import main.dto.*;
+
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class EmployeeDaoTest {
+
+    private EmployeeDAO employeeDAO;
+    private Long companyId;
+
+    @BeforeAll
+    public void setUpDatabase() {
+        employeeDAO = new EmployeeDAO();
+        CompanyDAO companyDAO = new CompanyDAO();
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            session.beginTransaction();
+            CompanyDTO testCompany = new CompanyDTO("Test Company", "123 Main Street", BigDecimal.valueOf(100000));
+            companyId = companyDAO.createCompany(testCompany);
+            session.getTransaction().commit();
+        }
+    }
+
+    @BeforeEach
+    void setUp() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            session.beginTransaction();
+
+            session.createQuery("UPDATE Employee SET isDeleted = true WHERE isDeleted = false").executeUpdate();
+
+            session.getTransaction().commit();
+        }
+    }
+
+    @AfterEach
+    void delPrevious() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            session.beginTransaction();
+            // Обновяваме всички служители с isDeleted = false на true
+            session.createQuery("UPDATE Employee SET isDeleted = true WHERE isDeleted = false")
+                    .executeUpdate();
+
+            session.getTransaction().commit();
+        }
+    }
+
+    @Test
+    public void testSaveEmployee() {
+        Set<Qualification> qualifications = Set.of(Qualification.PASSENGERS_12_PLUS);
+
+        EmployeeDTO employeeDTO = new EmployeeDTO("John Doe", qualifications,5000.00);
+        Long employeeId = employeeDAO.createEmployee(employeeDTO, companyId);
+        assertNotNull(employeeId);
+
+        EmployeeDTO retrievedEmployee = employeeDAO.getEmployee(employeeId);
+        assertEquals("John Doe", retrievedEmployee.getName());
+        assertFalse(retrievedEmployee.getQualification().isEmpty());
+        assertEquals(5000.00, retrievedEmployee.getSalary());
+    }
+
+    @Test
+    public void testGetEmployee_NotFound() {
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            employeeDAO.getEmployee(999L);
+        });
+
+        assertEquals("Employee with ID 999 does not exist.", exception.getMessage());
+    }
+
+    @Test
+    public void testGetAllEmployees() {
+        employeeDAO.createEmployee(new EmployeeDTO("Alice", Set.of(), 8000), companyId);
+        employeeDAO.createEmployee(new EmployeeDTO("Bob", Set.of(), 4000), companyId);
+
+        List<EmployeeDTO> employees = employeeDAO.getAllEmployees();
+        assertEquals(2, employees.size());
+    }
+
+    @Test
+    public void testUpdateEmployee() {
+        EmployeeDTO employeeDTO = new EmployeeDTO("Alice", Set.of(), 8000);;
+        Long employeeId = employeeDAO.createEmployee(employeeDTO, companyId);
+
+        EmployeeDTO updatedDTO = new EmployeeDTO("Alice Smith", Set.of(), 8000);
+        employeeDAO.updateEmployee(updatedDTO, employeeId);
+
+        EmployeeDTO updatedEmployee = employeeDAO.getEmployee(employeeId);
+        assertEquals("Alice Smith", updatedEmployee.getName());
+        assertTrue(updatedEmployee.getQualification().isEmpty());
+        assertEquals(8000, updatedEmployee.getSalary());
+    }
+
+    @Test
+    public void testDeleteEmployee() {
+        EmployeeDTO employeeDTO = new EmployeeDTO("Bob", Set.of(), 4000);
+        Long employeeId = employeeDAO.createEmployee(employeeDTO, companyId);
+        employeeDAO.deleteEmployee(employeeId);
+
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            employeeDAO.getEmployee(employeeId);
+        });
+
+        assertTrue(exception.getMessage().contains("does not exist"));
+    }
+
+    @Test
+    public void testGetEmployeesSortedBySalary() {
+        employeeDAO.createEmployee(new EmployeeDTO("Alice",  Set.of(), 7000), companyId);
+        employeeDAO.createEmployee(new EmployeeDTO("Bob",  Set.of(), 4000), companyId);
+        employeeDAO.createEmployee(new EmployeeDTO("Charlie",  Set.of(), 5000), companyId);
+
+        List<EmployeeDTO> employees = employeeDAO.getEmployeesSortedBySalary();
+        assertEquals(3, employees.size());
+
+        assertEquals("Alice", employees.get(0).getName()); // Най-висока заплата
+        assertEquals("Charlie", employees.get(1).getName()); // Средна заплата
+        assertEquals("Bob", employees.get(2).getName()); // Най-ниска заплата
+    }
+
+    @AfterAll
+    public void tearDown() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            session.createNativeQuery("DELETE FROM employee_qualification").executeUpdate();
+            session.createQuery("DELETE FROM Employee").executeUpdate();
+            session.createQuery("DELETE FROM Company").executeUpdate();
+
+            session.flush();
+            transaction.commit();
+        }
+    }
+}package main.dao.integration;
+
+import main.dao.*;
+import main.dto.*;
+import main.entity.Qualification;
+import main.configuration.HibernateUtil;
+import main.entity.VehicleType;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import org.junit.jupiter.api.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Set;
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class TransportDaoTest {
+
+    private Long companyId;
+    private Long clientId;
+    private Long employeeId;
+    private Long vehicleId;
+    private TransportDAO transportDAO;
+
+    @BeforeAll
+    void setup() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            CompanyDTO companyDTO = new CompanyDTO("TestCompany", "Sofia, Bulgaria", BigDecimal.valueOf(100000));
+            CompanyDAO companyDAO = new CompanyDAO();
+            companyId = companyDAO.createCompany(companyDTO);
+
+            ClientDTO clientDTO = new ClientDTO("Ivan", "ivan@example.com");
+            ClientDAO clientDAO = new ClientDAO();
+            clientId = clientDAO.createClient(clientDTO, companyId);
+
+            EmployeeDTO employeeDTO = new EmployeeDTO("D. Ivanov", Set.of(Qualification.MILITARY_CARGO), 3000);
+            EmployeeDAO employeeDAO = new EmployeeDAO();
+            employeeId = employeeDAO.createEmployee(employeeDTO, companyId);
+
+            VehicleDTO vehicleDTO = new VehicleDTO(VehicleType.MILITARY_VEHICLE, 4, "SF440205AB", Qualification.MILITARY_CARGO);
+            VehicleDAO vehicleDAO = new VehicleDAO();
+            vehicleId = vehicleDAO.createVehicle(vehicleDTO, companyId);
+
+            transportDAO = new TransportDAO();
+            transaction.commit();
+        }
+    }
+
+    @AfterEach
+    void delPrevious() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            session.beginTransaction();
+            // Обновяваме всички служители с isDeleted = false на true
+            session.createQuery("UPDATE Transport SET isDeleted = true WHERE isDeleted = false").executeUpdate();
+            session.getTransaction().commit();
+        }
+    }
+
+    @Test
+    void testCreateTransport() {
+        TransportDTO transportDTO = new TransportDTO(
+                "Sofia", "Varna", LocalDate.of(2024, 12, 24),
+                LocalDate.of(2024, 12, 25), "Table",
+                2000, 200, true
+        );
+
+        Assertions.assertDoesNotThrow(() ->
+                transportDAO.createTransport(transportDTO, companyId, clientId, employeeId, vehicleId)
+        );
+    }
+
+    @Test
+    void testGetTransport() {
+        TransportDTO transportDTO = new TransportDTO(
+                "Sofia", "Plovdiv", LocalDate.of(2024, 12, 26),
+                LocalDate.of(2024, 12, 27), "Chairs",
+                1500, 150, false
+        );
+
+        Long transportId = transportDAO.createTransport(transportDTO, companyId, clientId, employeeId, vehicleId);
+        TransportDTO retrievedTransport = transportDAO.getTransport(transportId); // ID-то трябва да е съществуващо
+
+        Assertions.assertEquals("Sofia", retrievedTransport.getStartLocation());
+        Assertions.assertEquals("Plovdiv", retrievedTransport.getEndLocation());
+    }
+
+    @Test
+    void testGetAllTransports() {
+        TransportDTO transportDTO1 = new TransportDTO(
+                "Sofia", "Burgas", LocalDate.of(2025, 1, 1),
+                LocalDate.of(2025, 1, 2), "Electronics",
+                3000, 300, true
+        );
+        Long transportId1 = transportDAO.createTransport(transportDTO1, companyId, clientId, employeeId, vehicleId);
+        TransportDTO transportDTO2 = new TransportDTO(
+                "Sofia", "Burgas", LocalDate.of(2025, 1, 1),
+                LocalDate.of(2025, 1, 2), "Electronics",
+                3000, 300, true
+        );
+        Long transportId2 = transportDAO.createTransport(transportDTO2, companyId, clientId, employeeId, vehicleId);
+
+        List<TransportDTO> transports = transportDAO.getAllTransports();
+        Assertions.assertEquals(2, transports.size());
+    }
+
+    @Test
+    void testUpdateTransport() {
+        TransportDTO updatedTransportDTO = new TransportDTO(
+                "Sofia", "Burgas", LocalDate.of(2025, 1, 1),
+                LocalDate.of(2025, 1, 2), "Electronics",
+                3000, 300, true
+        );
+
+        Long transportId = transportDAO.createTransport(updatedTransportDTO, companyId, clientId, employeeId, vehicleId);
+
+        transportDAO.updateTransport(transportId, updatedTransportDTO); // ID-то трябва да съществува
+        TransportDTO updatedTransport = transportDAO.getTransport(transportId);
+
+        Assertions.assertEquals("Burgas", updatedTransport.getEndLocation());
+        Assertions.assertEquals("Electronics", updatedTransport.getCargoDescription());
+    }
+
+    @Test
+    void testDeleteTransport() {
+        TransportDTO transportDTO = new TransportDTO(
+                "Sofia", "Burgas", LocalDate.of(2025, 1, 1),
+                LocalDate.of(2025, 1, 2), "Electronics",
+                3000, 300, true
+        );
+        Long transportId = transportDAO.createTransport(transportDTO, companyId, clientId, employeeId, vehicleId);
+        transportDAO.deleteTransport(transportId);
+        Assertions.assertThrows(IllegalArgumentException.class, () -> transportDAO.getTransport(1L));
+    }
+
+    @Test
+    void testGetTransportsByDestination() {
+        TransportDTO transportDTO = new TransportDTO(
+                "Sofia", "Burgas", LocalDate.of(2025, 1, 1),
+                LocalDate.of(2025, 1, 2), "Electronics",
+                3000, 300, true
+        );
+        Long transportId = transportDAO.createTransport(transportDTO, companyId, clientId, employeeId, vehicleId);
+        List<TransportDTO> transports = transportDAO.getTransportsByDestination("Varna");
+        Assertions.assertTrue(transports.isEmpty());
+    }
+
+    @Test
+    void testGetTotalRevenue() {
+        TransportDTO transportDTO = new TransportDTO(
+                "Sofia", "Plovdiv", LocalDate.of(2024, 12, 26),
+                LocalDate.of(2024, 12, 27), "Chairs",
+                1500, 150, true
+        );
+
+        Long transportId = transportDAO.createTransport(transportDTO, companyId, clientId, employeeId, vehicleId);
+
+        double totalRevenue = transportDAO.getTotalRevenue();
+        Assertions.assertEquals(150, totalRevenue );
+    }
+
+    @Test
+    void testGetTotalTransports() {
+        TransportDTO transportDTO = new TransportDTO(
+                "Sofia", "Plovdiv", LocalDate.of(2024, 12, 26),
+                LocalDate.of(2024, 12, 27), "Chairs",
+                1500, 150, false
+        );
+
+        Long transportId = transportDAO.createTransport(transportDTO, companyId, clientId, employeeId, vehicleId);
+
+        long totalTransports = transportDAO.getTotalTransports();
+        Assertions.assertEquals(1, totalTransports);
+    }
+
+    @Test
+    void testGetTotalRevenueByDriver() {
+        TransportDTO transportDTO = new TransportDTO(
+                "Sofia", "Plovdiv", LocalDate.of(2024, 12, 26),
+                LocalDate.of(2024, 12, 27), "Chairs",
+                1500, 150, true
+        );
+
+        Long transportId = transportDAO.createTransport(transportDTO, companyId, clientId, employeeId, vehicleId);
+
+        double totalRevenue = transportDAO.getTotalRevenueByDriver(employeeId);
+        Assertions.assertEquals(150, totalRevenue);
+    }
+
+    @AfterAll
+    public void tearDown() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            session.createNativeQuery("DELETE FROM employee_qualification").executeUpdate();
+            session.createQuery("DELETE FROM Transport").executeUpdate();
+            session.createQuery("DELETE FROM Employee").executeUpdate();
+            session.createQuery("DELETE FROM Client").executeUpdate();
+            session.createQuery("DELETE FROM Vehicle").executeUpdate();
+            session.createQuery("DELETE FROM Company").executeUpdate();
+
+            session.flush();
+            transaction.commit();
+        }
+    }
+}package main.dao.integration;
+
+import main.configuration.HibernateUtil;
+import main.dao.ClientDAO;
+import main.dao.CompanyDAO;
+import main.dto.ClientDTO;
+import main.dto.CompanyDTO;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import org.junit.jupiter.api.*;
+import java.util.List;
+import static org.junit.jupiter.api.Assertions.*;
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class ClientDaoTest {
+
+    private ClientDAO clientDAO;
+    private CompanyDAO companyDAO;
+
+    @BeforeAll
+    public void setUp() {
+        clientDAO = new ClientDAO();
+        companyDAO = new CompanyDAO();
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            session.beginTransaction();
+            session.getTransaction().commit();
+        }
+    }
+
+    @BeforeEach
+    void cleanUp() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            session.beginTransaction();
+            session.createQuery("delete from Client").executeUpdate();
+            session.createQuery("delete from Company").executeUpdate();
+            session.getTransaction().commit();
+        }
+    }
+
+    @Test
+    public void testCreateClient() {
+        CompanyDTO companyDTO = new CompanyDTO("Test Company", "Sofia, Bulgaria", null);
+        Long companyId = companyDAO.createCompany(companyDTO);
+
+        ClientDTO clientDTO = new ClientDTO("Test Client", "testclient@gmail.com");
+        Long clientId = clientDAO.createClient(clientDTO, companyId);
+
+        assertNotNull(clientId);
+
+        ClientDTO retrievedClient = clientDAO.getClient(clientId);
+        assertEquals("Test Client", retrievedClient.getName());
+        assertEquals("testclient@gmail.com", retrievedClient.getContactInfo());
+    }
+
+    @Test
+    public void testGetClient_NotFound() {
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            clientDAO.getClient(999L);
+        });
+        assertEquals("Client with ID 999 does not exist or is deleted.", exception.getMessage());
+    }
+
+    @Test
+    public void testUpdateClient() {
+        CompanyDTO companyDTO = new CompanyDTO("Test Company", "Sofia, Bulgaria", null);
+        Long companyId = companyDAO.createCompany(companyDTO);
+
+        ClientDTO clientDTO = new ClientDTO("Original Client", "original@gmail.com");
+        Long clientId = clientDAO.createClient(clientDTO, companyId);
+
+        ClientDTO updatedClientDTO = new ClientDTO("Updated Client", "updated@gmail.com");
+        clientDAO.updateClient(updatedClientDTO, clientId);
+
+        ClientDTO retrievedClient = clientDAO.getClient(clientId);
+        assertEquals("Updated Client", retrievedClient.getName());
+        assertEquals("updated@gmail.com", retrievedClient.getContactInfo());
+    }
+
+    @Test
+    public void testDeleteClient() {
+        CompanyDTO companyDTO = new CompanyDTO("Test Company", "Sofia, Bulgaria", null);
+        Long companyId = companyDAO.createCompany(companyDTO);
+
+        ClientDTO clientDTO = new ClientDTO("Deletable Client", "deletable@gmail.com");
+        Long clientId = clientDAO.createClient(clientDTO, companyId);
+
+        clientDAO.deleteClient(clientId);
+
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            clientDAO.getClient(clientId);
+        });
+        assertEquals("Client with ID " + clientId + " does not exist or is deleted.", exception.getMessage());
+    }
+
+    @Test
+    public void testGetAllClients() {
+        CompanyDTO companyDTO = new CompanyDTO("Test Company", "Sofia, Bulgaria", null);
+        Long companyId = companyDAO.createCompany(companyDTO);
+
+        ClientDTO client1 = new ClientDTO("Client 1", "client1@gmail.com");
+        ClientDTO client2 = new ClientDTO("Client 2", "client2@gmail.com");
+
+        clientDAO.createClient(client1, companyId);
+        clientDAO.createClient(client2, companyId);
+
+        List<ClientDTO> clients = clientDAO.getAllClients();
+        assertEquals(2, clients.size());
+
+        assertTrue(clients.stream().anyMatch(c -> c.getName().equals("Client 1")));
+        assertTrue(clients.stream().anyMatch(c -> c.getName().equals("Client 2")));
+    }
+
+    @AfterAll
+    public void tearDown() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            session.createQuery("DELETE FROM Client").executeUpdate();
+            session.createQuery("DELETE FROM Company").executeUpdate();
+
+            session.flush();
+            transaction.commit();
+        }
+    }
+}package main.dao.integration;
+
+import main.configuration.HibernateUtil;
+import main.dao.ClientDAO;
+import main.dao.CompanyDAO;
+import main.dao.EmployeeDAO;
+import main.dao.VehicleDAO;
+import main.dto.*;
+import main.entity.Qualification;
+import main.entity.VehicleType;
+import org.hibernate.Session;
+import org.junit.jupiter.api.*;
+import java.math.BigDecimal;
+import java.util.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class CompanyDaoTest {
+
+    private CompanyDAO companyDAO;
+
+    @BeforeEach
+    void setUp() {
+        companyDAO = new CompanyDAO();
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            session.beginTransaction();
+            session.createQuery("UPDATE Company SET isDeleted = true WHERE isDeleted = false").executeUpdate();
+            session.getTransaction().commit();
+        }
+    }
+
+    @AfterEach
+    void tearDown() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            if (session.getTransaction().isActive()) {
+                session.getTransaction().rollback();
+            }
+        }
+    }
+
+    @Test
+    public void testCreateCompany() {
+        CompanyDTO companyDTO = new CompanyDTO();
+        companyDTO.setName("Test Company");
+        companyDTO.setRevenue(new BigDecimal(100000.00));
+        companyDTO.setAddress("123 Main Street");
+
+        Long companyId = companyDAO.createCompany(companyDTO);
+        assertNotNull(companyId);
+
+        CompanyDTO retrievedCompany = companyDAO.getCompanyById(companyId);
+        assertEquals("Test Company", retrievedCompany.getName());
+        assertEquals(0, retrievedCompany.getRevenue().compareTo(new BigDecimal("100000.00")));
+        assertEquals("123 Main Street", retrievedCompany.getAddress());
+    }
+
+    @Test
+    public void testGetCompanyById_NotFound() {
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            companyDAO.getCompanyById(12L);
+        });
+
+        assertEquals("Company with ID 12 does not exist.", exception.getMessage());
+    }
+
+    @Test
+    public void testUpdateCompany() {
+        CompanyDTO companyDTO = new CompanyDTO();
+        companyDTO.setName("Initial Company");
+        companyDTO.setRevenue(new BigDecimal(100000.00));
+        companyDTO.setAddress("123 Main Street");
+
+        Long companyId = companyDAO.createCompany(companyDTO);
+        assertNotNull(companyId);
+
+        CompanyDTO updateDTO = new CompanyDTO();
+        updateDTO.setName("Updated Company");
+        updateDTO.setRevenue(new BigDecimal(150000.00));
+        updateDTO.setAddress("124 Main Street");
+
+        companyDAO.updateCompany(updateDTO, companyId);
+
+        CompanyDTO updatedCompany = companyDAO.getCompanyById(companyId);
+        assertEquals("Updated Company", updatedCompany.getName());
+        assertEquals(0, updatedCompany.getRevenue().compareTo(new BigDecimal("150000.00")));
+        assertEquals("124 Main Street", updatedCompany.getAddress());
+
+    }
+
+    @Test
+    public void testDeleteCompany() {
+        CompanyDTO companyDTO = new CompanyDTO();
+        companyDTO.setName("Deletable Company");
+        companyDTO.setRevenue(new BigDecimal(10000.00));
+        companyDTO.setAddress("123 Main Street");
+
+        Long companyId = companyDAO.createCompany(companyDTO);
+        assertNotNull(companyId);
+
+        companyDAO.deleteCompany(companyId);
+
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            companyDAO.getCompanyById(companyId);
+        });
+
+        assertTrue(exception.getMessage().contains("does not exist"));
+    }
+
+    @Test
+    public void testGetAllCompanies() {
+        CompanyDTO company1 = new CompanyDTO("Company A", "Sofia, Bulgaria", BigDecimal.valueOf(200000));
+        CompanyDTO company2 = new CompanyDTO("Company B", "Sofia, Bulgaria", BigDecimal.valueOf(200000));
+
+        Long companyId1 = companyDAO.createCompany(company1);
+        Long companyId2 = companyDAO.createCompany(company2);
+        assertNotNull(companyId1);
+        assertNotNull(companyId2);
+
+        List<CompanyDTO> companies = companyDAO.getAllCompanies();
+        assertEquals(2, companies.size());
+    }
+
+    @Test
+    public void testGetCompaniesSortedByRevenue() {
+        CompanyDTO company1 = new CompanyDTO("Company A", "Sofia, Bulgaria", BigDecimal.valueOf(100000));
+        CompanyDTO company2 = new CompanyDTO("Company B", "Sofia, Bulgaria", BigDecimal.valueOf(200000));
+        CompanyDTO company3 = new CompanyDTO("Company C", "Sofia, Bulgaria", BigDecimal.valueOf(150000));
+
+        Long companyId1 = companyDAO.createCompany(company1);
+        Long companyId2 = companyDAO.createCompany(company2);
+        Long companyId3 = companyDAO.createCompany(company3);
+
+        List<CompanyDTO> companies = companyDAO.getCompaniesSortedByRevenue();
+        assertEquals(3, companies.size());
+
+        assertEquals("Company B", companies.get(0).getName());
+        assertEquals("Company C", companies.get(1).getName());
+        assertEquals("Company A", companies.get(2).getName());
+    }
+
+    @Test
+    public void testGetCompaniesSortedByName() {
+        CompanyDTO company1 = new CompanyDTO("Zeta", "Sofia, Bulgaria", BigDecimal.valueOf(100000));
+        CompanyDTO company2 = new CompanyDTO("Alpha", "Sofia, Bulgaria", BigDecimal.valueOf(200000));
+        CompanyDTO company3 = new CompanyDTO("Beta", "Sofia, Bulgaria", BigDecimal.valueOf(150000));
+
+        Long companyId1 = companyDAO.createCompany(company1);
+        Long companyId2 = companyDAO.createCompany(company2);
+        Long companyId3 = companyDAO.createCompany(company3);
+
+        List<CompanyDTO> companies = companyDAO.getCompaniesSortedByName();
+        assertEquals(3, companies.size());
+
+        assertEquals("Alpha", companies.get(0).getName()); // Alphabetical order
+        assertEquals("Beta", companies.get(1).getName());
+        assertEquals("Zeta", companies.get(2).getName());
+    }
+
+    @Test
+    public void testGetCompanyEmployees() {
+        CompanyDTO companyDTO = new CompanyDTO("Company A", "Sofia, Bulgaria", BigDecimal.valueOf(100000));
+        Long companyId = companyDAO.createCompany(companyDTO);
+
+        EmployeeDTO employeeDTO = new EmployeeDTO("D. Ivanov", Set.of(Qualification.MILITARY_CARGO), 3000);
+        EmployeeDAO employeeDAO = new EmployeeDAO();
+        employeeDAO.createEmployee(employeeDTO, companyId);
+
+        Set<EmployeeDTO> employees = companyDAO.getCompanyEmployees(companyId);
+
+        assertNotNull(employees);
+        assertEquals(1, employees.size());
+    }
+
+    @Test
+    public void testGetCompanyClients() {
+        CompanyDTO companyDTO = new CompanyDTO("Company A", "Sofia, Bulgaria", BigDecimal.valueOf(100000));
+        Long companyId = companyDAO.createCompany(companyDTO);
+
+        ClientDTO clientDTO = new ClientDTO("Ivan", "ivan@example.com");
+        ClientDAO clientDAO = new ClientDAO();
+        clientDAO.createClient(clientDTO, companyId);
+
+        Set<ClientDTO> clients = companyDAO.getCompanyClients(companyId);
+
+        assertNotNull(clients);
+        assertEquals(1, clients.size());
+    }
+
+    @Test
+    public void testGetCompanyVehicles() {
+        CompanyDTO companyDTO = new CompanyDTO("Company A", "Sofia, Bulgaria", BigDecimal.valueOf(100000));
+        Long companyId = companyDAO.createCompany(companyDTO);
+
+        VehicleDTO vehicleDTO = new VehicleDTO(VehicleType.MILITARY_VEHICLE, 4, "SF440205AB", Qualification.MILITARY_CARGO);
+        VehicleDAO vehicleDAO = new VehicleDAO();
+        vehicleDAO.createVehicle(vehicleDTO, companyId);
+
+        Set<VehicleDTO> vehicles = companyDAO.getCompanyVehicles(companyId);
+
+        assertNotNull(vehicles);
+        assertEquals(1, vehicles.size());
+    }
+
+    @Test
+    public void testGetTotalRevenueByCompany() {
+        CompanyDTO companyDTO = new CompanyDTO("Company A", "Sofia, Bulgaria", BigDecimal.valueOf(100000));
+        Long companyId = companyDAO.createCompany(companyDTO);
+
+        double totalRevenue = companyDAO.getTotalRevenueByCompany(companyId);
+
+        assertEquals(0.0, totalRevenue);
+    }
+
+    @Test
+    public void testGetTotalTransportsByCompany() {
+        CompanyDTO companyDTO = new CompanyDTO("Company A", "Sofia, Bulgaria", BigDecimal.valueOf(100000));
+        Long companyId = companyDAO.createCompany(companyDTO);
+
+        double totalRevenue = companyDAO.getTotalTransportsByCompany(companyId);
+
+        assertEquals(0.0, totalRevenue);
+    }
+
+    @AfterAll
+    public static void shutDown() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            session.beginTransaction();
+            // Изчистване на всички записи в таблиците
+            session.createQuery("delete from Transport").executeUpdate();
+            session.createNativeQuery("DELETE FROM employee_qualification").executeUpdate();
+            session.createQuery("delete from Employee").executeUpdate();
+            session.createQuery("delete from Client").executeUpdate();
+            session.createQuery("delete from Vehicle").executeUpdate();
+            session.createQuery("delete from Company").executeUpdate();
+
+            session.getTransaction().commit();
+        }
+        HibernateUtil.shutdown();
+    }
+
+
+}package main.dao.validations;
+
+import main.entity.Employee;
+import main.entity.Company;
+import main.entity.Qualification;
+import org.junit.jupiter.api.Test;
+
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class EmployeeValidationTest {
+
+    private final Validator validator;
+
+    public EmployeeValidationTest() {
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            validator = factory.getValidator();
+        }
+    }
+
+    @Test
+    public void testValidEmployee() {
+        Employee employee = new Employee();
+        employee.setName("ValidName");
+        employee.setSalary(5000.00);
+        employee.setDeleted(false);
+        employee.setQualification(Set.of(Qualification.PASSENGERS_12_PLUS));
+        employee.setCompany(new Company());
+
+        Set<ConstraintViolation<Employee>> violations = validator.validate(employee);
+
+        assertTrue(violations.isEmpty(), "Expected no validation errors for a valid employee.");
+    }
+
+    @Test
+    public void testEmployeeNameBlank() {
+        Employee employee = new Employee();
+        employee.setName(" ");
+        employee.setSalary(5000.00);
+        employee.setDeleted(false);
+        employee.setQualification(Set.of(Qualification.PASSENGERS_12_PLUS));
+        employee.setCompany(new Company());
+
+        Set<ConstraintViolation<Employee>> violations = validator.validate(employee);
+        Set<String> messages = violations.stream()
+                .map(ConstraintViolation::getMessage)
+                .collect(Collectors.toSet());
+
+        assertTrue(messages.contains("Name cannot be empty"));
+        assertTrue(messages.contains("Name must be between 2 and 100 characters"));
+    }
+
+    @Test
+    public void testEmployeeNameTooShort() {
+        Employee employee = new Employee();
+        employee.setName("A"); // Too short
+        employee.setSalary(5000.00);
+        employee.setDeleted(false);
+        employee.setQualification(Set.of(Qualification.PASSENGERS_12_PLUS));
+        employee.setCompany(new Company());
+
+        Set<ConstraintViolation<Employee>> violations = validator.validate(employee);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Name must be between 2 and 100 characters"));
+    }
+
+    @Test
+    public void testEmployeeNameTooLong() {
+        Employee employee = new Employee();
+        employee.setName("A".repeat(101)); // Exceeds 100 characters
+        employee.setSalary(5000.00);
+        employee.setDeleted(false);
+        employee.setQualification(Set.of(Qualification.PASSENGERS_12_PLUS));
+        employee.setCompany(new Company());
+
+        Set<ConstraintViolation<Employee>> violations = validator.validate(employee);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Name must be between 2 and 100 characters"));
+    }
+
+    @Test
+    public void testEmployeeSalaryNegative() {
+        Employee employee = new Employee();
+        employee.setName("ValidName");
+        employee.setSalary(-5000.00); // Negative salary
+        employee.setDeleted(false);
+        employee.setQualification(Set.of(Qualification.PASSENGERS_12_PLUS));
+        employee.setCompany(new Company());
+
+        Set<ConstraintViolation<Employee>> violations = validator.validate(employee);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Salary must be positive"));
+    }
+
+    @Test
+    public void testEmployeeWithoutQualification() {
+        Employee employee = new Employee();
+        employee.setName("ValidName");
+        employee.setSalary(5000.00);
+        employee.setDeleted(false);
+        employee.setQualification(Set.of()); // No qualifications
+        employee.setCompany(new Company());
+
+        Set<ConstraintViolation<Employee>> violations = validator.validate(employee);
+
+        assertTrue(violations.isEmpty(), "No validation errors are expected for an empty qualification set.");
+    }
+
+}package main.dao.validations;
+
+import main.entity.Client;
+import main.entity.Company;
+import org.junit.jupiter.api.Test;
+
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class ClientValidationTest {
+
+    private final Validator validator;
+
+    public ClientValidationTest() {
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            validator = factory.getValidator();
+        }
+    }
+
+    @Test
+    public void testValidClient() {
+        Client client = new Client();
+        client.setName("ValidName");
+        client.setContactInfo("valid@example.com");
+        client.setDeleted(false);
+        client.setCompany(new Company());
+
+        Set<ConstraintViolation<Client>> violations = validator.validate(client);
+
+        assertTrue(violations.isEmpty(), "Expected no validation errors for a valid client.");
+    }
+
+    @Test
+    public void testClientNameBlank() {
+        Client client = new Client();
+        client.setName(" ");
+        client.setContactInfo("valid@example.com");
+        client.setDeleted(false);
+        client.setCompany(new Company());
+
+        Set<ConstraintViolation<Client>> violations = validator.validate(client);
+
+        assertTrue(violations.iterator().next().getMessage().contains("Name cannot be empty"));
+    }
+
+    @Test
+    public void testClientNameTooShort() {
+        Client client = new Client();
+        client.setName("A");
+        client.setContactInfo("valid@example.com");
+        client.setDeleted(false);
+        client.setCompany(new Company());
+
+        Set<ConstraintViolation<Client>> violations = validator.validate(client);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Name must be between 2 and 100 characters"));
+    }
+
+    @Test
+    public void testClientNameTooLong() {
+        Client client = new Client();
+        client.setName("A".repeat(101));
+        client.setContactInfo("valid@example.com");
+        client.setDeleted(false);
+        client.setCompany(new Company());
+
+        Set<ConstraintViolation<Client>> violations = validator.validate(client);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Name must be between 2 and 100 characters"));
+    }
+
+    @Test
+    public void testContactInfoBlank() {
+        Client client = new Client();
+        client.setName("ValidName");
+        client.setContactInfo(" ");
+        client.setDeleted(false);
+        client.setCompany(new Company());
+
+        Set<ConstraintViolation<Client>> violations = validator.validate(client);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Contact information cannot be empty"));
+    }
+
+    @Test
+    public void testContactInfoTooLong() {
+        Client client = new Client();
+        client.setName("ValidName");
+        client.setContactInfo("A".repeat(256));
+        client.setDeleted(false);
+        client.setCompany(new Company());
+
+        Set<ConstraintViolation<Client>> violations = validator.validate(client);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Contact information cannot exceed 255 characters"));
+    }
+
+}package main.dao.validations;
+
+import main.entity.Company;
+import org.junit.jupiter.api.Test;
+
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
+import java.math.BigDecimal;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class CompanyValidationTest {
+
+    private final Validator validator;
+
+    public CompanyValidationTest() {
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            validator = factory.getValidator();
+        }
+    }
+
+    @Test
+    public void testValidCompany() {
+        Company company = new Company();
+        company.setName("ValidName");
+        company.setAddress("123 Valid Address");
+        company.setRevenue(BigDecimal.valueOf(100000.00));
+        company.setDeleted(false);
+
+        Set<ConstraintViolation<Company>> violations = validator.validate(company);
+
+        assertTrue(violations.isEmpty(), "Expected no validation errors for a valid company.");
+    }
+
+    @Test
+    public void testCompanyNameNull() {
+        Company company = new Company();
+        company.setName(null); // Invalid name
+        company.setAddress("123 Valid Address");
+        company.setRevenue(BigDecimal.valueOf(100000.00));
+        company.setDeleted(false);
+
+        Set<ConstraintViolation<Company>> violations = validator.validate(company);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Company name cannot be null"));
+    }
+
+    @Test
+    public void testCompanyNameNotStartingWithCapital() {
+        Company company = new Company();
+        company.setName("invalidName"); // Name does not start with capital letter
+        company.setAddress("123 Valid Address");
+        company.setRevenue(BigDecimal.valueOf(100000.00));
+        company.setDeleted(false);
+
+        Set<ConstraintViolation<Company>> violations = validator.validate(company);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("must start with a capital letter"));
+    }
+
+    @Test
+    public void testRevenueNegative() {
+        Company company = new Company();
+        company.setName("ValidName");
+        company.setAddress("123 Valid Address");
+        company.setRevenue(BigDecimal.valueOf(-100000.00)); // Negative revenue
+        company.setDeleted(false);
+
+        Set<ConstraintViolation<Company>> violations = validator.validate(company);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Revenue must be a positive value"));
+    }
+
+    @Test
+    public void testAddressBlank() {
+        Company company = new Company();
+        company.setName("ValidName");
+        company.setAddress(" "); // Blank address
+        company.setRevenue(BigDecimal.valueOf(100000.00));
+        company.setDeleted(false);
+
+        Set<ConstraintViolation<Company>> violations = validator.validate(company);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Address cannot be blank"));
+    }
+
+    @Test
+    public void testAddressTooLong() {
+        Company company = new Company();
+        company.setName("ValidName");
+        company.setAddress("A".repeat(256));
+        company.setRevenue(BigDecimal.valueOf(100000.00));
+        company.setDeleted(false);
+
+        Set<ConstraintViolation<Company>> violations = validator.validate(company);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("must not exceed 255 characters"));
+    }
+}
+package main.dao.validations;
+
+import main.entity.Vehicle;
+import main.entity.Company;
+import main.entity.Qualification;
+import main.entity.VehicleType;
+import org.junit.jupiter.api.Test;
+
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class VehicleValidationTest {
+
+    private final Validator validator;
+
+    public VehicleValidationTest() {
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            validator = factory.getValidator();
+        }
+    }
+
+    @Test
+    public void testValidVehicle() {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setType(VehicleType.MILITARY_VEHICLE); // Assuming TRUCK is a valid enum value
+        vehicle.setRequiredQualification(Qualification.MILITARY_CARGO);
+        vehicle.setCapacity(10);
+        vehicle.setRegistrationNumber("ABC-123");
+        vehicle.setDeleted(false);
+        vehicle.setCompany(new Company());
+
+        Set<ConstraintViolation<Vehicle>> violations = validator.validate(vehicle);
+
+        assertTrue(violations.isEmpty(), "Expected no validation errors for a valid vehicle.");
+    }
+
+    @Test
+    public void testVehicleTypeNull() {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setType(null); // Null type
+        vehicle.setRequiredQualification(Qualification.PASSENGERS_12_PLUS);
+        vehicle.setCapacity(10);
+        vehicle.setRegistrationNumber("ABC-123");
+        vehicle.setDeleted(false);
+        vehicle.setCompany(new Company());
+
+        Set<ConstraintViolation<Vehicle>> violations = validator.validate(vehicle);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Vehicle type cannot be null"));
+    }
+
+    @Test
+    public void testCapacityNegative() {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setType(VehicleType.VAN);
+        vehicle.setRequiredQualification(Qualification.PASSENGERS_12_PLUS);
+        vehicle.setCapacity(-10); // Negative capacity
+        vehicle.setRegistrationNumber("ABC-123");
+        vehicle.setDeleted(false);
+        vehicle.setCompany(new Company());
+
+        Set<ConstraintViolation<Vehicle>> violations = validator.validate(vehicle);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Capacity must be a positive number"));
+    }
+
+    @Test
+    public void testRegistrationNumberBlank() {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setType(VehicleType.CAR);
+        vehicle.setRequiredQualification(null);
+        vehicle.setCapacity(100);
+        vehicle.setRegistrationNumber(" "); // Blank registration number
+        vehicle.setDeleted(false);
+        vehicle.setCompany(new Company());
+
+        Set<ConstraintViolation<Vehicle>> violations = validator.validate(vehicle);
+
+        assertEquals(1, violations.size());
+        assertTrue(violations.iterator().next().getMessage().contains("Registration number cannot be blank"));
+    }
+
+    @Test
+    public void testDuplicateRegistrationNumber() {
+        Vehicle vehicle1 = new Vehicle();
+        vehicle1.setType(VehicleType.BUS);
+        vehicle1.setRequiredQualification(Qualification.PASSENGERS_12_PLUS);
+        vehicle1.setCapacity(50);
+        vehicle1.setRegistrationNumber("1234");
+        vehicle1.setDeleted(false);
+        vehicle1.setCompany(new Company());
+
+        Vehicle vehicle2 = new Vehicle();
+        vehicle2.setType(VehicleType.BUS);
+        vehicle2.setRequiredQualification(Qualification.PASSENGERS_12_PLUS);
+        vehicle2.setCapacity(50);
+        vehicle2.setRegistrationNumber("1234"); // Duplicate registration number
+        vehicle2.setDeleted(false);
+        vehicle2.setCompany(new Company());
+
+        Set<ConstraintViolation<Vehicle>> violations1 = validator.validate(vehicle1);
+        Set<ConstraintViolation<Vehicle>> violations2 = validator.validate(vehicle2);
+
+        assertTrue(violations1.isEmpty(), "Expected no validation errors for the first vehicle.");
+        assertTrue(violations2.isEmpty(), "Validation does not detect duplicates without database checks.");
+    }
+}package main.dao.validations;
+
+import main.entity.Transport;
+import main.entity.Company;
+import main.entity.Vehicle;
+import main.entity.Employee;
+import main.entity.Client;
+import org.junit.jupiter.api.Test;
+
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
+import java.time.LocalDate;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class TransportValidationTest {
+
+    private final Validator validator;
+
+    public TransportValidationTest() {
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            validator = factory.getValidator();
+        }
+    }
+
+    @Test
+    public void testValidTransport() {
+        Transport transport = new Transport();
+        transport.setStartLocation("New York");
+        transport.setEndLocation("Los Angeles");
+        transport.setDepartureDate(LocalDate.now().plusDays(1));
+        transport.setArrivalDate(LocalDate.now().plusDays(2));
+        transport.setCargoDescription("Electronics");
+        transport.setCargoWeight(1000.0);
+        transport.setPrice(5000.0);
+        transport.setPaid(false);
+        transport.setDeleted(false);
+        transport.setVehicle(new Vehicle());
+        transport.setDriver(new Employee());
+        transport.setCompany(new Company());
+        transport.setClient(new Client());
+
+        Set<ConstraintViolation<Transport>> violations = validator.validate(transport);
+
+        assertTrue(violations.isEmpty(), "Expected no validation errors for a valid transport.");
+    }
+
+    @Test
+    public void testStartLocationBlank() {
+        Transport transport = new Transport();
+        transport.setStartLocation(" "); // Blank start location
+        transport.setEndLocation("Los Angeles");
+        transport.setDepartureDate(LocalDate.now().plusDays(1));
+        transport.setArrivalDate(LocalDate.now().plusDays(2));
+        transport.setCargoDescription("Electronics");
+        transport.setCargoWeight(1000.0);
+        transport.setPrice(5000.0);
+        transport.setPaid(false);
+        transport.setDeleted(false);
+        transport.setVehicle(new Vehicle());
+        transport.setDriver(new Employee());
+        transport.setCompany(new Company());
+        transport.setClient(new Client());
+
+        Set<ConstraintViolation<Transport>> violations = validator.validate(transport);
+
+        assertTrue(violations.iterator().next().getMessage().contains("Start location cannot be blank"));
+    }
+
+    @Test
+    public void testEndLocationBlank() {
+        Transport transport = new Transport();
+        transport.setStartLocation("New York");
+        transport.setEndLocation(" "); // Blank end location
+        transport.setDepartureDate(LocalDate.now().plusDays(1));
+        transport.setArrivalDate(LocalDate.now().plusDays(2));
+        transport.setCargoDescription("Electronics");
+        transport.setCargoWeight(1000.0);
+        transport.setPrice(5000.0);
+        transport.setPaid(false);
+        transport.setDeleted(false);
+        transport.setVehicle(new Vehicle());
+        transport.setDriver(new Employee());
+        transport.setCompany(new Company());
+        transport.setClient(new Client());
+
+        Set<ConstraintViolation<Transport>> violations = validator.validate(transport);
+
+        assertTrue(violations.iterator().next().getMessage().contains("End location cannot be blank"));
+    }
+
+    @Test
+    public void testDepartureDateNull() {
+        Transport transport = new Transport();
+        transport.setStartLocation("New York");
+        transport.setEndLocation("Los Angeles");
+        transport.setDepartureDate(null); // Null departure date
+        transport.setArrivalDate(LocalDate.now().plusDays(2));
+        transport.setCargoDescription("Electronics");
+        transport.setCargoWeight(1000.0);
+        transport.setPrice(5000.0);
+        transport.setPaid(false);
+        transport.setDeleted(false);
+        transport.setVehicle(new Vehicle());
+        transport.setDriver(new Employee());
+        transport.setCompany(new Company());
+        transport.setClient(new Client());
+
+        Set<ConstraintViolation<Transport>> violations = validator.validate(transport);
+        assertTrue(violations.iterator().next().getMessage().contains("must not be null"));
+    }
+
+    @Test
+    public void testNegativeCargoWeight() {
+        Transport transport = new Transport();
+        transport.setStartLocation("New York");
+        transport.setEndLocation("Los Angeles");
+        transport.setDepartureDate(LocalDate.now().plusDays(1));
+        transport.setArrivalDate(LocalDate.now().plusDays(2));
+        transport.setCargoDescription("Electronics");
+        transport.setCargoWeight(-1000.0); // Negative cargo weight
+        transport.setPrice(5000.0);
+        transport.setPaid(false);
+        transport.setDeleted(false);
+        transport.setVehicle(new Vehicle());
+        transport.setDriver(new Employee());
+        transport.setCompany(new Company());
+        transport.setClient(new Client());
+
+        Set<ConstraintViolation<Transport>> violations = validator.validate(transport);
+        assertTrue(violations.iterator().next().getMessage().contains("Cargo weight must be positive"));
+    }
+
+    @Test
+    public void testNegativePrice() {
+        Transport transport = new Transport();
+        transport.setStartLocation("New York");
+        transport.setEndLocation("Los Angeles");
+        transport.setDepartureDate(LocalDate.now().plusDays(1));
+        transport.setArrivalDate(LocalDate.now().plusDays(2));
+        transport.setCargoDescription("Electronics");
+        transport.setCargoWeight(1000.0);
+        transport.setPrice(-5000.0); // Negative price
+        transport.setPaid(false);
+        transport.setDeleted(false);
+        transport.setVehicle(new Vehicle());
+        transport.setDriver(new Employee());
+        transport.setCompany(new Company());
+        transport.setClient(new Client());
+
+        Set<ConstraintViolation<Transport>> violations = validator.validate(transport);
+        assertTrue(violations.iterator().next().getMessage().contains("Price cannot be negative"));
+    }
+}package main.dto;
+
+import java.time.LocalDate;
+
+public class TransportDTO {
+    private String startLocation;
+    private String endLocation;
+    private LocalDate departureDate;
+    private LocalDate arrivalDate;
+    private String cargoDescription;
+    private double cargoWeight;
+    private double price;
+    private boolean isPaid;
+
+    // Конструктор
+    public TransportDTO() {
+    }
+    public TransportDTO(String startLocation, String endLocation, LocalDate departureDate,
+                        LocalDate arrivalDate, String cargoDescription, double cargoWeight, double price, boolean isPaid) {
+        this.startLocation = startLocation;
+        this.endLocation = endLocation;
+        this.departureDate = departureDate;
+        this.arrivalDate = arrivalDate;
+        this.cargoDescription = cargoDescription;
+        this.cargoWeight = cargoWeight;
+        this.price = price;
+        this.isPaid = isPaid;
+    }
+
+    // Гетъри и сетъри
+    public String getStartLocation() {
+        return startLocation;
+    }
+
+    public void setStartLocation(String startLocation) {
+        this.startLocation = startLocation;
+    }
+
+    public String getEndLocation() {
+        return endLocation;
+    }
+
+    public void setEndLocation(String endLocation) {
+        this.endLocation = endLocation;
+    }
+
+    public LocalDate getDepartureDate() {
+        return departureDate;
+    }
+
+    public void setDepartureDate(LocalDate departureDate) {
+        this.departureDate = departureDate;
+    }
+
+    public LocalDate getArrivalDate() {
+        return arrivalDate;
+    }
+
+    public void setArrivalDate(LocalDate arrivalDate) {
+        this.arrivalDate = arrivalDate;
+    }
+
+    public String getCargoDescription() {
+        return cargoDescription;
+    }
+
+    public void setCargoDescription(String cargoDescription) {
+        this.cargoDescription = cargoDescription;
+    }
+
+    public double getCargoWeight() {
+        return cargoWeight;
+    }
+
+    public void setCargoWeight(double cargoWeight) {
+        this.cargoWeight = cargoWeight;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public void setPrice(double price) {
+        this.price = price;
+    }
+
+    public boolean isPaid() {
+        return isPaid;
+    }
+
+    public void setPaid(boolean paid) {
+        isPaid = paid;
+    }
+
+    @Override
+    public String toString() {
+        return "TransportDTO{" +
+                ", startLocation='" + startLocation + '\'' +
+                ", endLocation='" + endLocation + '\'' +
+                ", departureDate='" + departureDate + '\'' +
+                ", arrivalDate='" + arrivalDate + '\'' +
+                ", cargoDescription='" + cargoDescription + '\'' +
+                ", cargoWeight=" + cargoWeight +
+                ", price=" + price +
+                ", isPaid=" + isPaid +
+                '}';
+    }
+}package main.dto;
+
+public class ClientDTO {
+    private String name;
+    private String contactInfo;
+
+    // Конструктор
+    public ClientDTO(String name, String contactInfo) {
+        this.name = name;
+        this.contactInfo = contactInfo;
+    }
+
+    // Гетъри и сетъри
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getContactInfo() {
+        return contactInfo;
+    }
+
+    public void setContactInfo(String contactInfo) {
+        this.contactInfo = contactInfo;
+    }
+
+    @Override
+    public String toString() {
+        return "ClientDTO{" +
+                ", name='" + name + '\'' +
+                ", contactInfo='" + contactInfo + '\'' +
+                '}';
+    }
+}package main.dto;
+
+import main.entity.Qualification;
+
+import java.util.Set;
+
+public class EmployeeDTO {
+    private String name;
+    private Set<Qualification> qualification;
+    private double salary;
+
+    // Конструктор
+    public EmployeeDTO(String name, Set<Qualification> qualification, double salary) {
+        this.name = name;
+        this.qualification = qualification;
+        this.salary = salary;
+    }
+
+    // Гетъри и сетъри
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Set<Qualification> getQualification() {
+        return qualification;
+    }
+
+    public void setQualification(Set<Qualification> qualification) {
+        this.qualification = (qualification != null) ? qualification : Set.of();
+    }
+
+    public double getSalary() {
+        return salary;
+    }
+
+    public void setSalary(double salary) {
+        this.salary = salary;
+    }
+
+    @Override
+    public String toString() {
+        return "EmployeeDTO{" +
+                ", name='" + name + '\'' +
+                ", qualification='" + qualification + '\'' +
+                ", salary=" + salary +
+                '}';
+    }
+}package main.dto;
+
+import main.entity.Qualification;
+import main.entity.VehicleType;
+
+public class VehicleDTO {
+    private VehicleType type;
+    private int capacity;
+    private String registrationNumber;
+    private Qualification requiredQualification;
+
+    // Конструктор
+    public VehicleDTO(VehicleType type, int capacity, String registrationNumber, Qualification requiredQualification) {
+        this.type = type;
+        this.capacity = capacity;
+        this.registrationNumber = registrationNumber;
+        this.requiredQualification = requiredQualification;
+    }
+
+    // Гетъри и сетъри
+    public VehicleType getType() {
+        return type;
+    }
+
+    public void setType(VehicleType type) {
+        this.type = type;
+    }
+
+    public int getCapacity() {
+        return capacity;
+    }
+
+    public void setCapacity(int capacity) {
+        this.capacity = capacity;
+    }
+
+    public String getRegistrationNumber() {
+        return registrationNumber;
+    }
+
+    public void setRegistrationNumber(String registrationNumber) {
+        this.registrationNumber = registrationNumber;
+    }
+
+    public Qualification getRequiredQualification() {
+        return requiredQualification;
+    }
+
+    public void setRequiredQualification(Qualification requiredQualification) {
+        this.requiredQualification = requiredQualification;
+    }
+
+    @Override
+    public String toString() {
+        return "VehicleDTO{" +
+                ", type='" + type + '\'' +
+                ", capacity=" + capacity +
+                ", registrationNumber='" + registrationNumber + '\'' +
+                ", requiredQualification=" + requiredQualification +
+                '}';
+    }
+}package main.dto;
+
+import java.math.BigDecimal;
+
+public class CompanyDTO {
+    private String name;
+    private String address;
+    private BigDecimal revenue;
+
+    // Конструктор
+    public CompanyDTO() {
+    }
+
+    public CompanyDTO( String name, String address, BigDecimal revenue) {
+        this.name = name;
+        this.address = address;
+        this.revenue = revenue;
+    }
+
+    // Гетъри и сетъри
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public BigDecimal getRevenue() {
+        return revenue;
+    }
+
+    public void setRevenue(BigDecimal revenue) {
+        this.revenue = revenue;
+    }
+
+    @Override
+    public String toString() {
+        return "CompanyDTO{" +
+                ", name='" + name + '\'' +
+                ", address='" + address + '\'' +
+                ", revenue=" + revenue +
+                '}';
+    }
+}package main.configuration;
+
+import main.entity.*;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+
+public class HibernateUtil {
+
+    private static final SessionFactory sessionFactory;
+
+
+    static {
+        try {
+            // Създаване на sessionFactory
+            sessionFactory = new Configuration().configure("hibernate.cfg.xml")
+                    .addAnnotatedClass(Company.class)
+                    .addAnnotatedClass(Vehicle.class)
+                    .addAnnotatedClass(Employee.class)
+                    .addAnnotatedClass(Transport.class)
+                    .addAnnotatedClass(Client.class)
+                    .buildSessionFactory();
+        } catch (Throwable ex) {
+            throw new ExceptionInInitializerError(ex);
+        }
+    }
+
+    public static SessionFactory getSessionFactory() {
+        return sessionFactory;
+    }
+
+    public static void shutdown() {
+        getSessionFactory().close();
+    }
+    public static void initializeSchema() {
+        try (Session session = getSessionFactory().openSession()) {
+            session.beginTransaction();
+
+            session.createNativeQuery("""
+            CREATE TABLE IF NOT EXISTS company (
+                companyId BIGINT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(20) NOT NULL,
+                address VARCHAR(255),
+                revenue DECIMAL(17,2),
+                is_deleted BOOLEAN NOT NULL
+            )
+        """).executeUpdate();
+
+            session.getTransaction().commit();
+        }
+    }
+}package main.entity;
+
+import javax.persistence.*;
+import javax.validation.constraints.*;
+import java.util.Objects;
+import java.util.Set;
+
+@Entity
+@Table(name = "client")
+public class Client {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long clientId;
+
+    @NotBlank(message = "Name cannot be empty")
+    @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @NotBlank(message = "Contact information cannot be empty")
+    @Size(max = 255, message = "Contact information cannot exceed 255 characters")
+    @Column(name = "contact_info", nullable = false)
+    private String contactInfo;
+
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    // Релации с други таблици
+    @ManyToOne
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
+    @OneToMany(mappedBy = "client")
+    private Set<Transport> transports;
+
+    // Конструктори
+    public Client() {}
+
+    public Client(String name, String contactInfo, Company company) {
+        this.name = name;
+        this.contactInfo = contactInfo;
+        this.company = company;
+        this.isDeleted = false;
+    }
+
+    // Гетъри и сетъри
+    public Long getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(Long clientId) {
+        this.clientId = clientId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getContactInfo() {
+        return contactInfo;
+    }
+
+    public void setContactInfo(String contactInfo) {
+        this.contactInfo = contactInfo;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
+    }
+
+    public Set<Transport> getTransports() {
+        return transports;
+    }
+
+    public void setTransports(Set<Transport> transports) {
+        this.transports = transports;
+    }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Client client = (Client) o;
+        return Objects.equals(getClientId(), client.getClientId());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(getClientId());
+    }
+
+    @Override
+    public String toString() {
+        return "Client{" +
+                "clientId=" + clientId +
+                ", name='" + name + '\'' +
+                ", contactInfo='" + contactInfo + '\'' +
+                ", companyId=" + (company != null ? company.getCompanyId() : null) +
+                ", isDeleted=" + isDeleted +
+                '}';
+    }
+}package main.entity;
+import javax.persistence.*;
+import java.time.LocalDate;
+import java.util.Date;
+import java.util.Objects;
+import javax.validation.constraints.*;
+
+@Entity
+@Table(name = "transport")
+public class Transport {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long transportId;
+
+    @NotBlank(message = "Start location cannot be blank")
+    @Column(name = "start_location", nullable = false)
+    private String startLocation;
+
+    @NotBlank(message = "End location cannot be blank")
+    @Column(name = "end_location", nullable = false)
+    private String endLocation;
+
+    @NotNull
+    @Column(name = "departure_date", nullable = false)
+    private LocalDate departureDate;
+
+    @NotNull
+    @Column(name = "arrival_date", nullable = false)
+    private LocalDate arrivalDate;
+
+    @NotBlank(message = "Cargo description cannot be blank")
+    @Column(name = "cargo_description")
+    private String cargoDescription;
+
+    @Positive(message = "Cargo weight must be positive")
+    @Column(name = "cargo_weight")
+    private double cargoWeight;
+
+    @PositiveOrZero(message = "Price cannot be negative")
+    @Column(name = "price", nullable = false)
+    private double price;
+
+    @Column(name = "is_paid", nullable = false)
+    private boolean isPaid;
+
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted;
+
+    // Релации с други таблици
+    @ManyToOne
+    @JoinColumn(name = "vehicle_id", nullable = false)
+    private Vehicle vehicle;
+
+    @ManyToOne
+    @JoinColumn(name = "employee_id", nullable = false)
+    private Employee driver;
+
+    @ManyToOne
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
+    @ManyToOne
+    @JoinColumn(name = "client_id", nullable = false)
+    private Client client;
+
+    // Конструктори, гетъри и сетъри
+    public Transport() {}
+
+    public Transport(Vehicle vehicle, Employee driver, Company company, Client client, String startLocation,
+                     String endLocation, LocalDate departureDate, LocalDate arrivalDate,
+                     String cargoDescription, double cargoWeight, double price, boolean isPaid) {
+        this.vehicle = vehicle;
+        this.driver = driver;
+        this.company = company;
+        this.client = client;
+        this.startLocation = startLocation;
+        this.endLocation = endLocation;
+        this.departureDate = departureDate;
+        this.arrivalDate = arrivalDate;
+        this.cargoDescription = cargoDescription;
+        this.cargoWeight = cargoWeight;
+        this.price = price;
+        this.isPaid = isPaid;
+        this.isDeleted = false;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Transport transport = (Transport) o;
+        return Objects.equals(getTransportId(), transport.getTransportId());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(getTransportId());
+    }
+
+    public Long getTransportId() {
+        return transportId;
+    }
+
+    public void setTransportId(Long transportId) {
+        this.transportId = transportId;
+    }
+
+    public Vehicle getVehicle() {
+        return vehicle;
+    }
+
+    public void setVehicle(Vehicle vehicle) {
+        this.vehicle = vehicle;
+    }
+
+    public Employee getDriver() {
+        return driver;
+    }
+
+    public void setDriver(Employee driver) {
+        this.driver = driver;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
+    }
+
+    public Client getClient() {
+        return client;
+    }
+
+    public void setClient(Client client) {
+        this.client = client;
+    }
+
+    public String getStartLocation() {
+        return startLocation;
+    }
+
+    public void setStartLocation(String startLocation) {
+        this.startLocation = startLocation;
+    }
+
+    public String getEndLocation() {
+        return endLocation;
+    }
+
+    public void setEndLocation(String endLocation) {
+        this.endLocation = endLocation;
+    }
+
+    public LocalDate getDepartureDate() {
+        return departureDate;
+    }
+
+    public void setDepartureDate(LocalDate departureDate) {
+        this.departureDate = departureDate;
+    }
+
+    public LocalDate getArrivalDate() {
+        return arrivalDate;
+    }
+
+    public void setArrivalDate(LocalDate arrivalDate) {
+        this.arrivalDate = arrivalDate;
+    }
+
+    public String getCargoDescription() {
+        return cargoDescription;
+    }
+
+    public void setCargoDescription(String cargoDescription) {
+        this.cargoDescription = cargoDescription;
+    }
+
+    public double getCargoWeight() {
+        return cargoWeight;
+    }
+
+    public void setCargoWeight(double cargoWeight) {
+        this.cargoWeight = cargoWeight;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public void setPrice(double price) {
+        this.price = price;
+    }
+
+    public boolean isPaid() {
+        return isPaid;
+    }
+
+    public void setPaid(boolean paid) {
+        isPaid = paid;
+    }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
+
+    @Override
+    public String toString() {
+        return "Transport{" +
+                "transportId=" + transportId +
+                ", vehicle=" + vehicle.getRegistrationNumber() +
+                ", driver=" + driver.getName() +
+                ", company=" + company.getName() +
+                ", client=" + client.getName() +
+                ", startLocation='" + startLocation + '\'' +
+                ", endLocation='" + endLocation + '\'' +
+                ", departureDate='" + departureDate + '\'' +
+                ", arrivalDate='" + arrivalDate + '\'' +
+                ", cargoDescription='" + cargoDescription + '\'' +
+                ", cargoWeight=" + cargoWeight +
+                ", price=" + price +
+                ", isPaid=" + isPaid +
+                ", isDeleted=" + isDeleted +
+                '}';
+    }
+}package main.entity;
+
+public enum VehicleType {
+    CAR,
+    VAN,
+    BUS,
+    TANKER,
+    REFRIGERATED_TRUCK,
+    LIVESTOCK_CARRIER,
+    CHEMICAL_TANKER,
+    MILITARY_VEHICLE,
+    MEDICAL_VEHICLE,
+}    package main.entity;
+    import java.math.BigDecimal;
+    import java.util.*;
+    import javax.persistence.*;
+    import javax.validation.constraints.*;
+
+    @Entity
+    @Table(name = "company")
+    public class Company {
+
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        @Column(name = "companyId", nullable = false, updatable = false)
+        private Long companyId;
+
+        @NotNull(message = "Company name cannot be null")
+        @Size(min = 1, max = 20, message = "Company name must be between 1 and 100 characters")
+        @Pattern(regexp = "^[A-Z].*", message = "Company name must start with a capital letter")
+        @Column(name = "name", nullable = false, length = 20)
+        private String name;
+
+        @NotBlank(message = "Address cannot be blank")
+        @Size(max = 255, message = "Address must not exceed 255 characters")
+        @Column(name = "address", length = 255)
+        private String address;
+
+        @DecimalMin(value = "0.00", message = "Revenue must be a positive value")
+        @Digits(integer = 15, fraction = 2, message = "Revenue must have up to 15 digits and 2 decimal places")
+        @Column(name = "revenue", precision = 15, scale = 2)
+        private BigDecimal revenue;
+
+        @Column(name = "is_deleted", nullable = false)
+        private boolean isDeleted = false;
+
+        // Релации с други таблици
+        @OneToMany(mappedBy = "company")
+        private Set<Vehicle> vehicles;
+
+        @OneToMany(mappedBy = "company")
+        private Set<Employee> employees;
+
+        @OneToMany(mappedBy = "company")
+        private Set<Transport> transports;
+
+        @OneToMany(mappedBy = "company")
+        private  Set<Client> clients;
+
+        // Конструктори, гетъри и сетъри
+        public Company() {
+        }
+
+        public Company(String name, String address, BigDecimal revenue) {
+            this.name = name;
+            this.address = address;
+            this.revenue = revenue;
+            this.isDeleted = false;
+        }
+
+        public Long getCompanyId() {
+            return companyId;
+        }
+
+        public void setCompanyId(Long companyId) {
+            this.companyId = companyId;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getAddress() {
+            return address;
+        }
+
+        public void setAddress(String address) {
+            this.address = address;
+        }
+
+        public BigDecimal getRevenue() {
+            return revenue;
+        }
+
+        public void setRevenue(BigDecimal revenue) {
+            this.revenue = revenue;
+        }
+
+        public Set<Vehicle> getVehicles() {
+            return vehicles;
+        }
+
+        public void setVehicles(Set<Vehicle> vehicles) {
+            this.vehicles = vehicles;
+        }
+
+        public Set<Employee> getEmployees() {
+            return employees;
+        }
+
+        public void setEmployees(Set<Employee> employees) {
+            this.employees = employees;
+        }
+
+        public Set<Transport> getTransports() {
+            return transports;
+        }
+
+        public void setTransports(Set<Transport> transports) {
+            this.transports = transports;
+        }
+
+        public Set<Client> getClients() {
+            return clients;
+        }
+
+        public void setClients(Set<Client> clients) {
+            this.clients = clients;
+        }
+
+        public boolean isDeleted() {
+            return isDeleted;
+        }
+
+        public void setDeleted(boolean deleted) {
+            isDeleted = deleted;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Company company = (Company) o;
+            return Objects.equals(getCompanyId(), company.getCompanyId());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(getCompanyId());
+        }
+
+        @Override
+        public String toString() {
+            return "Company{" +
+                    "companyId=" + companyId +
+                    ", name='" + name + '\'' +
+                    ", address='" + address + '\'' +
+                    ", revenue=" + revenue +
+                    ", isDeleted=" + isDeleted +
+                    '}';
+        }
+    }package main.entity;
+import javax.persistence.*;
+import java.util.*;
+import javax.validation.constraints.*;
+
+@Entity
+@Table(name = "vehicle")
+public class Vehicle {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long vehicleId;
+
+    @NotNull(message = "Vehicle type cannot be null")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    private VehicleType type;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "required_qualification")
+    private Qualification requiredQualification;
+
+    @Positive(message = "Capacity must be a positive number")
+    @Column(name = "capacity", nullable = false)
+    private int capacity;
+
+    @NotBlank(message = "Registration number cannot be blank")
+    @Column(name = "registration_number", nullable = false, unique = true)
+    private String registrationNumber;
+
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    // Релации с други таблици
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
+    @OneToMany(mappedBy = "vehicle")
+    private Set<Transport> transports;
+
+    // Конструктори, гетъри и сетъри
+    public Vehicle() {}
+
+    public Vehicle(Company company, VehicleType type, int capacity, String registrationNumber, Qualification requiredQualification) {
+        this.company = company;
+        this.type = type;
+        this.capacity = capacity;
+        this.registrationNumber = registrationNumber;
+        this.requiredQualification = requiredQualification;
+        this.isDeleted = false;
+    }
+
+    public Long getVehicleId() {
+        return vehicleId;
+    }
+
+    public void setVehicleId(Long vehicleId) {
+        this.vehicleId = vehicleId;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
+    }
+
+    public VehicleType getType() {
+        return type;
+    }
+
+    public void setType(VehicleType type) {
+        this.type = type;
+    }
+
+    public int getCapacity() {
+        return capacity;
+    }
+
+    public void setCapacity(int capacity) {
+        this.capacity = capacity;
+    }
+
+    public String getRegistrationNumber() {
+        return registrationNumber;
+    }
+
+    public void setRegistrationNumber(String registrationNumber) {
+        this.registrationNumber = registrationNumber;
+    }
+
+    public Set<Transport> getTransports() {
+        return transports;
+    }
+
+    public void setTransports(Set<Transport> transports) {
+        this.transports = transports;
+    }
+
+    public Qualification getRequiredQualification() {
+        return requiredQualification;
+    }
+
+    public void setRequiredQualification(Qualification requiredQualification) {
+        this.requiredQualification = requiredQualification;
+    }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Vehicle vehicle = (Vehicle) o;
+        return Objects.equals(getVehicleId(), vehicle.getVehicleId());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(getVehicleId());
+    }
+
+    @Override
+    public String toString() {
+        return "Vehicle{" +
+                "vehicleId=" + vehicleId +
+                ", companyId=" + (company != null ? company.getCompanyId() : null) +
+                ", type='" + type + '\'' +
+                ", capacity=" + capacity +
+                ", registrationNumber='" + registrationNumber + '\'' +
+                ", requiredQualification=" + requiredQualification +
+                ", isDeleted=" + isDeleted +
+                '}';
+    }
+}package main.entity;
+
+public enum Qualification {
+    PASSENGERS_12_PLUS,            // Превоз на повече от 12 човека
+    REFRIGERATED_GOODS,            // Хладилни товари
+    LIVESTOCK_TRANSPORT,           // Превоз на животни
+    LIQUID_TRANSPORT,              // Превоз на течности
+    CHEMICALS,                     // Химически вещества
+    MEDICAL_SUPPLIES,              // Медицински доставки
+    MILITARY_CARGO;                // Военни товари
+}
+package main.entity;
+
+import javax.persistence.*;
+import javax.validation.constraints.*;
+import java.util.*;
+
+@Entity
+@Table(name = "employee")
+public class Employee {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long employeeId;
+
+    @NotBlank(message = "Name cannot be empty")
+    @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Positive(message = "Salary must be positive")
+    @Column(name = "salary", nullable = false)
+    private double salary;
+
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    @ElementCollection()
+    @CollectionTable(name = "employee_qualification", joinColumns = @JoinColumn(name = "employee_id"))
+    @Enumerated(EnumType.STRING)
+    private Set<Qualification> qualification;
+
+    // Релации с други таблици
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
+    @OneToMany(mappedBy = "driver")
+    private Set<Transport> transports;
+
+    // Конструктори, гетъри и сетъри
+    public Employee() {}
+
+    public Employee(Company company, String name,  Set<Qualification> qualification, double salary) {
+        this.company = company;
+        this.name = name;
+        this.qualification = qualification;
+        this.salary = salary;
+        this.isDeleted = false;
+    }
+
+    public Long getEmployeeId() {
+        return employeeId;
+    }
+
+    public void setEmployeeId(Long employeeId) {
+        this.employeeId = employeeId;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public double getSalary() {
+        return salary;
+    }
+
+    public void setSalary(double salary) {
+        this.salary = salary;
+    }
+
+    public Set<Transport> getTransports() {
+        return transports;
+    }
+
+    public void setTransports(Set<Transport> transports) {
+        this.transports = transports;
+    }
+
+    public Set<Qualification> getQualification() {
+        return qualification;
+    }
+
+    public void setQualification(Set<Qualification> qualification) {
+        this.qualification = qualification;
+    }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Employee employee = (Employee) o;
+        return Objects.equals(getEmployeeId(), employee.getEmployeeId());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(getEmployeeId());
+    }
+
+    @Override
+    public String toString() {
+        return "Employee{" +
+                "employeeId=" + employeeId +
+                ", companyId=" + (company != null ? company.getCompanyId() : null) +
+                ", name='" + name + '\'' +
+                ", qualification='" + qualification + '\'' +
+                ", salary=" + salary +
+                ", isDeleted=" + isDeleted +
+                '}';
+    }
+}package main.dao;
+
+import main.configuration.HibernateUtil;
+import main.dto.VehicleDTO;
+import main.entity.Company;
+import main.entity.Vehicle;
+import main.mapper.VehicleMapper;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import javax.persistence.criteria.*;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class VehicleDAO {
+    public Long createVehicle(VehicleDTO vehicleDTO, Long companyId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Company company = session.get(Company.class, companyId);
+            if (company == null) {
+                throw new IllegalArgumentException("Company with ID " + companyId + " does not exist.");
+            }
+
+            Vehicle vehicle = VehicleMapper.toEntity(vehicleDTO);
+            vehicle.setCompany(company); // Свързване с компанията
+
+            Long vehicleId = (Long) session.save(vehicle);
+            transaction.commit();
+            return  vehicleId;
+        }
+    }
+
+    public VehicleDTO getVehicle(Long id) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Vehicle vehicle = session.get(Vehicle.class, id);
+
+            if (vehicle == null || vehicle.isDeleted()) {
+                throw new IllegalArgumentException("Vehicle with ID " + id + " does not exist or is deleted.");
+            }
+
+            return VehicleMapper.toDTO(vehicle);
+        }
+    }
+
+    public List<VehicleDTO> getAllVehicles() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            List<Vehicle> vehicles = session.createQuery("from Vehicle v where v.isDeleted = false", Vehicle.class).list();
+            return vehicles.stream()
+                    .map(VehicleMapper::toDTO) // Преобразуване към DTO
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public void updateVehicle(VehicleDTO vehicleDTO, Long vehicleId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Vehicle existingVehicle = session.get(Vehicle.class, vehicleId);
+                if (existingVehicle == null || existingVehicle.isDeleted()) {
+                    throw new IllegalArgumentException("Vehicle not found with ID: " + vehicleId);
+                }
+
+            VehicleMapper.updateEntityFromDTO(vehicleDTO, existingVehicle);
+            session.update(existingVehicle);
+            transaction.commit();
+        }
+    }
+
+    public void deleteVehicle(Long id) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+            Vehicle vehicle = session.get(Vehicle.class, id);
+            if (vehicle == null || vehicle.isDeleted()) {
+                throw new IllegalArgumentException("Vehicle with ID " + id + " does not exist or is already deleted.");
+            }
+            vehicle.setDeleted(true); // Логическо изтриване
+            session.update(vehicle);
+            transaction.commit();
+        }
+    }
+
+    public VehicleDTO getVehicleByRegistrationNumber(String registrationNumber) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            CriteriaBuilder cb = session.getCriteriaBuilder();
+            CriteriaQuery<Vehicle> cq = cb.createQuery(Vehicle.class);
+            Root<Vehicle> root = cq.from(Vehicle.class);
+
+            cq.select(root).where(
+                    cb.and(
+                            cb.equal(root.get("registrationNumber"), registrationNumber),
+                            cb.isFalse(root.get("isDeleted"))
+                    )
+            );
+
+            Vehicle vehicle = session.createQuery(cq).uniqueResult();
+            return vehicle != null ? VehicleMapper.toDTO(vehicle) : null;
+        }
+    }
+
+       /*
+    public boolean canClientDriveVehicle(Long vehicleId, Set<Qualification> clientQualifications) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Vehicle vehicle = session.get(Vehicle.class, vehicleId);
+
+            if (vehicle == null || vehicle.isDeleted()) {
+                throw new IllegalArgumentException("Vehicle with ID " + vehicleId + " does not exist or is deleted.");
+            }
+
+            if (vehicle.getCapacity() >= 12) {
+                return clientQualifications.contains(Qualification.PASSENGERS_12_PLUS);
+            }
+
+            return true;
+        }
+    }
+     */
+}package main.dao;
+
+import main.configuration.HibernateUtil;
+import main.dto.*;
+import main.entity.*;
+import main.mapper.*;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import javax.persistence.criteria.*;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.io.*;
+
+public class CompanyDAO {
+
+    public Long createCompany(CompanyDTO companyDTO) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Company company = CompanyMapper.toEntity(companyDTO);
+            session.save(company);
+            Long companyId = company.getCompanyId();
+            System.out.println("Generated company ID: " + companyId);
+
+            transaction.commit();
+            return companyId;
+        }
+    }
+
+    public CompanyDTO getCompanyById(Long id) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Company company = session.get(Company.class, id);
+            if (company == null || company.isDeleted()) {
+                throw new IllegalArgumentException("Company with ID " + id + " does not exist.");
+            }
+            return CompanyMapper.toDTO(company);
+        }
+    }
+
+    public void updateCompany(CompanyDTO companyDTO, Long companyId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Company existingCompany = session.get(Company.class, companyId);
+            if (existingCompany == null || existingCompany.isDeleted()) {
+                throw new IllegalArgumentException("Cannot update company. The company either does not exist or is deleted.");
+            }
+
+            CompanyMapper.updateEntityFromDTO(companyDTO, existingCompany);
+            session.update(existingCompany);
+            transaction.commit();
+        }
+    }
+
+    public void deleteCompany(Long id) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Company company = session.get(Company.class, id);
+            if (company == null || company.isDeleted()) {
+                throw new IllegalArgumentException("Company with ID " + id + " does not exist or is already deleted.");
+            }
+
+            company.setDeleted(true);
+            session.update(company);
+            transaction.commit();
+        }
+    }
+
+    public List<CompanyDTO> getAllCompanies() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            List<Company> companies = session.createQuery("from Company c where c.isDeleted = false", Company.class).list();
+            return companies.stream()
+                    .map(CompanyMapper::toDTO)
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public List<CompanyDTO> getCompaniesSortedByRevenue() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            CriteriaBuilder cb = session.getCriteriaBuilder();
+            CriteriaQuery<Company> cq = cb.createQuery(Company.class);
+            Root<Company> root = cq.from(Company.class);
+            cq.select(root)
+                    .where(cb.equal(root.get("isDeleted"), false))
+                    .orderBy(cb.desc(root.get("revenue")));
+            List<Company> companies = session.createQuery(cq).getResultList();
+            return companies.stream()
+                    .map(CompanyMapper::toDTO)
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public List<CompanyDTO> getCompaniesSortedByName() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            CriteriaBuilder cb = session.getCriteriaBuilder();
+            CriteriaQuery<Company> cq = cb.createQuery(Company.class);
+            Root<Company> root = cq.from(Company.class);
+            cq.select(root)
+                    .where(cb.equal(root.get("isDeleted"), false))
+                    .orderBy(cb.asc(root.get("name")));
+
+            List<Company> companies = session.createQuery(cq).getResultList();
+            return companies.stream()
+                    .map(CompanyMapper::toDTO)
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public Set<EmployeeDTO> getCompanyEmployees(Long companyId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Company company = session.get(Company.class, companyId);
+            if (company == null || company.isDeleted()) {
+                throw new IllegalArgumentException("Company with ID " + companyId + " does not exist or is deleted.");
+            }
+
+            // Използваме JOIN FETCH, за да заредим и квалификациите на служителите
+            CriteriaBuilder cb = session.getCriteriaBuilder();
+            CriteriaQuery<Employee> cq = cb.createQuery(Employee.class);
+            Root<Employee> root = cq.from(Employee.class);
+
+            // Свързваме с qualifications на Employee и ги зареждаме с JOIN FETCH
+            root.fetch("qualification", JoinType.LEFT);  // Зареждаме qualifications заедно със служителите
+
+            cq.select(root).where(cb.equal(root.get("company"), company));
+            List<Employee> employeeList = session.createQuery(cq).getResultList();
+
+            return employeeList.stream()
+                    .map(EmployeeMapper::toDTO)
+                    .collect(Collectors.toSet());
+        }
+    }
+
+    public Set<ClientDTO> getCompanyClients(Long companyId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Company company = session.get(Company.class, companyId);
+            if (company == null || company.isDeleted()) {
+                throw new IllegalArgumentException("Company with ID " + companyId + " does not exist or is deleted.");
+            }
+            CriteriaBuilder cb = session.getCriteriaBuilder();
+            CriteriaQuery<Client> cq = cb.createQuery(Client.class);
+
+            Root<Client> root = cq.from(Client.class);
+            Join<Client, Company> companyJoin = root.join("company");
+            cq.select(root).where(cb.equal(companyJoin.get("companyId"), companyId));
+
+            List<Client> clients = session.createQuery(cq).getResultList();
+            return clients.stream()
+                    .map(ClientMapper::toDTO)
+                    .collect(Collectors.toSet());
+        }
+    }
+
+    public Set<VehicleDTO> getCompanyVehicles(Long companyId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Company company = session.get(Company.class, companyId);
+            if (company == null || company.isDeleted()) {
+                throw new IllegalArgumentException("Company with ID " + companyId + " does not exist or is deleted.");
+            }
+            CriteriaBuilder cb = session.getCriteriaBuilder();
+            CriteriaQuery<Vehicle> cq = cb.createQuery(Vehicle.class);
+
+            Root<Vehicle> root = cq.from(Vehicle.class);
+            Join<Vehicle, Company> companyJoin = root.join("company");
+            cq.select(root).where(cb.equal(companyJoin.get("companyId"), companyId));
+
+            List<Vehicle> vehicles = session.createQuery(cq).getResultList();
+            return vehicles.stream()
+                    .map(VehicleMapper::toDTO)
+                    .collect(Collectors.toSet());
+        }
+    }
+
+    public long getTotalTransportsByCompany(Long companyId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            String hql = "select count(t) from Transport t where t.isDeleted = false and t.company.id = :companyId";
+
+            Long totalTransports = session.createQuery(hql, Long.class)
+                    .setParameter("companyId", companyId)
+                    .getSingleResult();
+
+            return totalTransports != null ? totalTransports : 0L;
+        }
+    }
+
+    public double getTotalRevenueByCompany(Long companyId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            String hql = "select sum(t.price) from Transport t where t.isDeleted = false and t.isPaid = true and t.company.id = :companyId";
+
+            Double totalRevenue = session.createQuery(hql, Double.class)
+                    .setParameter("companyId", companyId)
+                    .getSingleResult();
+
+            return totalRevenue != null ? totalRevenue : 0.0;
+        }
+    }
+
+    public double getTotalRevenueByCompanyInRange(Long companyId, LocalDate startDate, LocalDate endDate) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            CriteriaBuilder cb = session.getCriteriaBuilder();
+            CriteriaQuery<Double> cq = cb.createQuery(Double.class);
+            Root<Transport> root = cq.from(Transport.class);
+
+            // Създаване на условията за филтриране
+            Predicate isNotDeleted = cb.isFalse(root.get("isDeleted"));
+            Predicate isPaid = cb.isTrue(root.get("isPaid"));
+            Predicate belongsToCompany = cb.equal(root.get("company").get("companyId"), companyId);
+            Predicate inDateRange = cb.and(
+                    cb.greaterThanOrEqualTo(root.get("departureDate"), startDate),
+                    cb.lessThanOrEqualTo(root.get("arrivalDate"), endDate)
+            );
+
+            // Обединяване на условията
+            cq.select(cb.sum(root.get("price")))
+                    .where(cb.and(isNotDeleted, isPaid, belongsToCompany, inDateRange));
+
+            // Изпълнение на заявката
+            Double totalRevenue = session.createQuery(cq).getSingleResult();
+
+            return (totalRevenue != null) ? totalRevenue : 0.0;
+        }
+    }
+
+    public long getTotalTransportsByCompanyInRange(Long companyId, LocalDate startDate, LocalDate endDate) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            CriteriaBuilder cb = session.getCriteriaBuilder();
+            CriteriaQuery<Long> cq = cb.createQuery(Long.class);
+            Root<Transport> root = cq.from(Transport.class);
+
+            // Създаване на условията за филтриране
+            Predicate isNotDeleted = cb.isFalse(root.get("isDeleted"));
+            Predicate belongsToCompany = cb.equal(root.get("company").get("companyId"), companyId);
+            Predicate inDateRange = cb.and(
+                    cb.greaterThanOrEqualTo(root.get("departureDate"), startDate),
+                    cb.lessThanOrEqualTo(root.get("arrivalDate"), endDate)
+            );
+
+            // Обединяване на условията
+            cq.select(cb.count(root))
+                    .where(cb.and(isNotDeleted, belongsToCompany, inDateRange));
+
+            // Изпълнение на заявката
+            Long totalTransports = session.createQuery(cq).getSingleResult();
+
+            return (totalTransports != null) ? totalTransports : 0L;
+        }
+    }
+
+   /*
+   public double getTotalProfitByCompany(Long companyId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            // 1) Взимаме самата компания от базата, за да получим initialInvestment
+            Company company = session.get(Company.class, companyId);
+            if (company == null || company.isDeleted()) {
+                throw new IllegalArgumentException("Company with ID " + companyId + " does not exist or is deleted.");
+            }
+
+            // Приемаме, че company.getRevenue() съдържа "първоначалната инвестиция".
+            double initialInvestment = (company.getRevenue() != null)
+                    ? company.getRevenue().doubleValue()
+                    : 0.0;
+
+            // 2) Взимаме сумата от цените на всички превози (Transport.price)
+            String hqlTransport = """
+            select sum(t.price)
+            from Transport t
+            where t.isDeleted = false
+              and t.isPaid = true
+              and t.company.companyId = :companyId
+        """;
+
+            Double totalRevenue = session.createQuery(hqlTransport, Double.class)
+                    .setParameter("companyId", companyId)
+                    .getSingleResult();
+
+            if (totalRevenue == null) {
+                totalRevenue = 0.0;
+            }
+
+            // 3) Взимаме сумата от заплатите (Employee.salary)
+            String hqlEmployees = """
+            select sum(e.salary)
+            from Employee e
+            where e.isDeleted = false
+              and e.company.companyId = :companyId
+        """;
+            Double totalSalaries = session.createQuery(hqlEmployees, Double.class)
+                    .setParameter("companyId", companyId)
+                    .getSingleResult();
+
+            if (totalSalaries == null) {
+                totalSalaries = 0.0;
+            }
+
+            double totalProfit = initialInvestment + totalRevenue - totalSalaries;
+
+            return totalProfit;
+        }
+    }
+
+    public Map<String, Object> getCompanyReport(Long companyId) {
+        Map<String, Object> report = new HashMap<>();
+
+        // Общи приходи
+        double totalRevenue = getTotalRevenueByCompany(companyId);
+        report.put("totalRevenue", totalRevenue);
+
+        // Брой превози
+        long totalTransports = getTotalTransportsByCompany(companyId);
+        report.put("totalTransports", totalTransports);
+
+        // Превозни средства на компанията
+        Set<VehicleDTO> vehicles = getCompanyVehicles(companyId);
+        report.put("vehicles", vehicles);
+
+        // Клиенти на компанията
+        Set<ClientDTO> clients = getCompanyClients(companyId);
+        report.put("clients", clients);
+
+        // Служители на компанията
+        Set<EmployeeDTO> employees = getCompanyEmployees(companyId);
+        report.put("employees", employees);
+
+        return report;
+    }
+    */
+
+    public void saveCompanyReportToFile(Long companyId, String directoryPath, String startDateStr, String endDateStr) {
+        File directory = new File(directoryPath);
+        if (!directory.exists()) {
+            throw new IllegalArgumentException("The path: " + directoryPath + " does not exist.");
+        }
+
+        // 1) Парсираме входните дати
+        LocalDate startDate;
+        LocalDate endDate;
+        try {
+            startDate = LocalDate.parse(startDateStr);
+            endDate = LocalDate.parse(endDateStr);
+        } finally {
+
+        }
+
+        // 2) Генерираме име на файл
+        String fileName = "report_" + companyId + ".txt";
+        String filePath = directoryPath + "/" + fileName;
+
+        // 3) Взимаме CompanyDTO, за да покажем име на компанията
+        CompanyDTO companyDTO = getCompanyById(companyId);
+
+        // 4) Взимаме обектите (Vehicles, Clients, Employees)
+        Set<VehicleDTO> vehicles = getCompanyVehicles(companyId);
+        Set<ClientDTO> clients   = getCompanyClients(companyId);
+        Set<EmployeeDTO> employees = getCompanyEmployees(companyId);
+
+        // 5) Изчисляваме приходи/броя на превози, но САМО за зададения период:
+        double totalRevenue = getTotalRevenueByCompanyInRange(companyId, startDate, endDate);
+        long totalTransports = getTotalTransportsByCompanyInRange(companyId, startDate, endDate);
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+            writer.write("--------- Report ---------");
+            writer.newLine();
+
+            // Заглавие + период
+            writer.write("Company: " + companyDTO.getName()
+                    + " (id: " + companyId + ")");
+            writer.newLine();
+            writer.write("Report for the period: " + startDateStr + " - " + endDateStr);
+            writer.newLine();
+            writer.newLine();
+
+            writer.write("Total Revenue (in period): " + totalRevenue);
+            writer.newLine();
+            writer.write("Total Transports (in period): " + totalTransports);
+            writer.newLine();
+            writer.newLine();
+
+            // Vehicles
+            writer.write("Vehicles:");
+            writer.newLine();
+            for (VehicleDTO v : vehicles) {
+                writer.write("  - " + v.getType()
+                        + ", '" + v.getRegistrationNumber() + "'");
+                writer.newLine();
+            }
+            writer.newLine();
+
+            // Clients
+            writer.write("Clients:");
+            writer.newLine();
+            for (ClientDTO c : clients) {
+                writer.write("  - " + c.getName()
+                        + ", '" + c.getContactInfo() + "'");
+                writer.newLine();
+            }
+            writer.newLine();
+
+            // Employees
+            writer.write("Employees:");
+            writer.newLine();
+            for (EmployeeDTO e : employees) {
+                writer.write("  - " + e.getName()
+                        + ", salary:" + e.getSalary());
+                writer.newLine();
+            }
+
+            writer.write("-----------------------------");
+            writer.newLine();
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error processing file", e);
+        }
+    }
+
+}package main.dao;
+
+import main.configuration.HibernateUtil;
+import main.entity.*;
+import main.dto.*;
+import main.mapper.*;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import javax.persistence.criteria.*;
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class TransportDAO {
+
+    public Long createTransport(TransportDTO transportDTO, Long companyId, Long clientId, Long employeeId, Long vehicleId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Company company = session.get(Company.class, companyId);
+            Client client = session.get(Client.class, clientId);
+            Employee employee = session.get(Employee.class, employeeId);
+            Vehicle vehicle = session.get(Vehicle.class, vehicleId);
+
+            if (company == null || client == null || employee == null || vehicle == null) {
+                throw new IllegalArgumentException("One or more related entities do not exist.");
+            }
+
+            if (company.isDeleted() || client.isDeleted() || employee.isDeleted() || vehicle.isDeleted()) {
+                throw new IllegalArgumentException("One or more related entities have been deleted.");
+            }
+
+            Qualification requiredQualification = vehicle.getRequiredQualification();
+            if (requiredQualification != null && !employee.getQualification().contains(requiredQualification)) {
+                throw new IllegalArgumentException("Employee does not have the required qualification: " + requiredQualification);
+            }
+
+            if (vehicle.getCapacity() >= 12 && !employee.getQualification().contains(Qualification.PASSENGERS_12_PLUS)) {
+                throw new IllegalArgumentException("Employee does not have the required qualification: " + Qualification.PASSENGERS_12_PLUS);
+            }
+
+            Transport transport = TransportMapper.toEntity(transportDTO);
+
+            transport.setCompany(company);
+            transport.setClient(client);
+            transport.setDriver(employee);
+            transport.setVehicle(vehicle);
+
+            Long transportId = (Long) session.save(transport);
+            transaction.commit();
+            return transportId;
+        }
+    }
+
+    public TransportDTO getTransport(Long id) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transport transport = session.get(Transport.class, id);
+            if (transport == null || transport.isDeleted()) {
+                throw new IllegalArgumentException("Transport with ID " + id + " does not exist or is deleted.");
+            }
+            return TransportMapper.toDTO(transport);
+        }
+    }
+
+    public List<TransportDTO> getAllTransports() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            List<Transport> transports = session.createQuery("from Transport where isDeleted = false", Transport.class).list();
+            return transports.stream()
+                    .map(TransportMapper::toDTO)
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public void updateTransport(Long transportId, TransportDTO transportDTO) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Transport existingTransport = session.get(Transport.class, transportId);
+            if (existingTransport == null || existingTransport.isDeleted()) {
+                throw new IllegalArgumentException("Transport with ID " + transportId + " does not exist.");
+            }
+
+            TransportMapper.updateEntityFromDTO(transportDTO, existingTransport);
+            existingTransport.setTransportId(existingTransport.getTransportId());
+            existingTransport.setCompany(existingTransport.getCompany());
+            existingTransport.setClient(existingTransport.getClient());
+            existingTransport.setDriver(existingTransport.getDriver());
+            existingTransport.setVehicle(existingTransport.getVehicle());
+
+            session.update(existingTransport);
+            transaction.commit();
+        }
+    }
+
+    public void deleteTransport(Long id) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+            Transport transport = session.get(Transport.class, id);
+            if (transport == null || transport.isDeleted()) {
+                throw new IllegalArgumentException("Transport with ID " + id + " does not exist or is already deleted.");
+            }
+            transport.setDeleted(true);  // Маркирай като изтрит
+            session.update(transport);
+            transaction.commit();
+        }
+    }
+
+    public long getTotalTransports() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            String hql = "select count(t) from Transport t where t.isDeleted = false";
+
+            Long totalTransports = session.createQuery(hql, Long.class)
+                    .getSingleResult();
+
+            return totalTransports != null ? totalTransports : 0L;
+        }
+    }
+
+    public double getTotalRevenue() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            return session.createQuery("select sum(t.price) from Transport t where t.isPaid = true and t.isDeleted = false", Double.class).getSingleResult();
+        }
+    }
+
+    public List<TransportDTO> getTransportsByDestination(String destination) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            CriteriaBuilder cb = session.getCriteriaBuilder();
+            CriteriaQuery<Transport> cq = cb.createQuery(Transport.class);
+            Root<Transport> root = cq.from(Transport.class);
+            Predicate condition = cb.and(
+                    cb.equal(root.get("endLocation"), destination),
+                    cb.isFalse(root.get("isDeleted"))
+            );
+            cq.where(condition);
+            List<Transport> transports = session.createQuery(cq).getResultList();
+
+            return transports.stream()
+                    .map(TransportMapper::toDTO)
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public double getTotalRevenueByDriver(Long driverId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            String hql = "select sum(t.price) from Transport t where t.driver.id = :driverId and t.isPaid = true and t.isDeleted = false";
+            Double totalRevenue = session.createQuery(hql, Double.class)
+                    .setParameter("driverId", driverId)
+                    .getSingleResult();
+
+            return totalRevenue != null ? totalRevenue : 0.0;
+        }
+    }
+
+    /*
+    public double getTotalRevenueByDateRange(String startDate, String endDate) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            // Парсиране на низовете в Date обекти
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date start = sdf.parse(startDate);
+            Date end = sdf.parse(endDate);
+
+            // HQL заявка
+            String hql = "select sum(t.price) from Transport t " +
+                    "where t.date >= :startDate and t.date <= :endDate and t.isDeleted = false";
+
+            Double totalRevenue = session.createQuery(hql, Double.class)
+                    .setParameter("startDate", start)
+                    .setParameter("endDate", end)
+                    .getSingleResult();
+
+            return totalRevenue != null ? totalRevenue : 0.0;
+        } catch (ParseException e) {
+            e.printStackTrace(); // Или хвърляйте грешка в зависимост от нуждите
+            return 0.0;
+        }
+    }
+
+    public List<Object[]> getDriverTransportCount() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            // Създаване на HQL заявка за броя на превозите за всеки шофьор
+            String hql = "select t.driver.id, count(t) from Transport t " +
+                    "where t.isDeleted = false group by t.driver.id";
+
+            List<Object[]> results = session.createQuery(hql).getResultList();
+
+            // Отпечатване на резултатите по начин, който показва стойностите
+            for (Object[] result : results) {
+                Long driverId = (Long) result[0];
+                Long transportCount = (Long) result[1];
+                System.out.println("Driver ID: " + driverId + ", Transport Count: " + transportCount);
+            }
+
+            return results;
+        }
+    }
+
+     */
+
+}package main.dao;
+
+import main.dto.*;
+import main.entity.Client;
+import main.configuration.HibernateUtil;
+import main.entity.*;
+import main.mapper.ClientMapper;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class ClientDAO {
+
+    public Long createClient(ClientDTO clientDTO, Long companyId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            // Извличаме компанията спрямо ID-то
+            Company company = session.get(Company.class, companyId);
+            if (company == null) {
+                throw new IllegalArgumentException("Company with ID " + companyId + " does not exist.");
+            }
+
+            Client client = ClientMapper.toEntity(clientDTO);
+            client.setCompany(company);
+            Long clientId = (Long) session.save(client);
+            transaction.commit();
+            return clientId;
+        }
+    }
+
+    public ClientDTO getClient(Long clientId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Client client = session.get(Client.class, clientId);
+            if (client == null || client.isDeleted()) { // Проверка за isDeleted
+                throw new IllegalArgumentException("Client with ID " + clientId + " does not exist or is deleted.");
+            }
+            return ClientMapper.toDTO(client);
+        }
+    }
+
+    public List<ClientDTO> getAllClients() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            List<Client> clients = session.createQuery("from Client c where c.isDeleted = false", Client.class).list();
+            return clients.stream()
+                    .map(ClientMapper::toDTO)
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public void updateClient(ClientDTO clientDTO, Long clientId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Client existingClient = session.get(Client.class, clientId);
+            if (existingClient == null || existingClient.isDeleted()) {
+                throw new IllegalArgumentException("Client with ID " + clientId + " does not exist.");
+            }
+
+            ClientMapper.updateEntityFromDTO(clientDTO, existingClient);
+            session.update(existingClient);
+            transaction.commit();
+        }
+    }
+
+    public void deleteClient(Long clientId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Client client = session.get(Client.class, clientId);
+            if (client == null || client.isDeleted()) {
+                throw new IllegalArgumentException("Client with ID " + clientId + " does not exist or is already deleted.");
+            }
+            client.setDeleted(true);
+            session.update(client);
+
+            transaction.commit();
+        }
+    }
+}package main.dao;
+
+import main.dto.EmployeeDTO;
+import main.entity.*;
+import main.configuration.HibernateUtil;
+import main.mapper.EmployeeMapper;
+import org.hibernate.Hibernate;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+
+import javax.persistence.criteria.*;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class EmployeeDAO {
+
+    public Long createEmployee(EmployeeDTO employeeDTO, Long companyId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Company company = session.get(Company.class, companyId);
+
+
+            Employee employee = EmployeeMapper.toEntity(employeeDTO);
+            employee.setCompany(company);
+            Long employeeId = (Long) session.save(employee);
+            transaction.commit();
+            return employeeId;
+        }
+    }
+
+    public EmployeeDTO getEmployee(Long employeeId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Employee employee = session.get(Employee.class, employeeId);
+            if (employee == null || employee.isDeleted()) {
+                throw new IllegalArgumentException("Employee with ID " + employeeId + " does not exist.");
+            }
+            Hibernate.initialize(employee.getQualification());
+
+            return EmployeeMapper.toDTO(employee);
+        }
+    }
+
+    public List<EmployeeDTO> getAllEmployees() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            List<Employee> employees = session.createQuery("FROM Employee WHERE isDeleted = false", Employee.class).list();
+            return employees.stream()
+                    .map(EmployeeMapper::toDTO)
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public void updateEmployee(EmployeeDTO employeeDTO, Long employeeId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+
+            Employee existingEmployee = session.get(Employee.class, employeeId);
+            if (existingEmployee == null || existingEmployee.isDeleted()) {
+                throw new IllegalArgumentException("Employee with ID " + employeeId + " does not exist.");
+            }
+
+            EmployeeMapper.updateEntityFromDTO(employeeDTO, existingEmployee);
+            session.update(existingEmployee);
+            transaction.commit();
+        }
+    }
+
+    public void deleteEmployee(Long employeeId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+            Employee employee = session.get(Employee.class, employeeId);
+            if (employee == null || employee.isDeleted()) {
+                throw new IllegalArgumentException("Employee with ID " + employeeId + " does not exist or is already deleted.");
+            }
+            employee.setDeleted(true);
+            session.update(employee);
+            transaction.commit();
+        }
+    }
+
+    public List<EmployeeDTO> getEmployeesSortedBySalary() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            CriteriaBuilder cb = session.getCriteriaBuilder();
+            CriteriaQuery<Employee> cq = cb.createQuery(Employee.class);
+            Root<Employee> root = cq.from(Employee.class);
+
+           // cq.select(root).orderBy(cb.desc(root.get("salary")));
+            cq.select(root).where(cb.equal(root.get("isDeleted"), false))  // Филтриране на не-изтрити служители
+                    .orderBy(cb.desc(root.get("salary")));
+
+            List<Employee> employees = session.createQuery(cq).getResultList();
+            return employees.stream()
+                    .map(EmployeeMapper::toDTO)
+                    .collect(Collectors.toList());
+        }
+    }
+
+}package main.mapper;
+
+import main.dto.CompanyDTO;
+import main.entity.Company;
+
+public class CompanyMapper {
+    public static CompanyDTO toDTO(Company company) {
+        CompanyDTO dto = new CompanyDTO();
+        dto.setName(company.getName());
+        dto.setAddress(company.getAddress());
+        dto.setRevenue(company.getRevenue());
+        return dto;
+    }
+
+    public static Company toEntity(CompanyDTO dto) {
+        Company company = new Company();
+        company.setName(dto.getName());
+        company.setAddress(dto.getAddress());
+        company.setRevenue(dto.getRevenue());
+        return company;
+    }
+
+    public static void updateEntityFromDTO(CompanyDTO dto, Company existingCompany) {
+        existingCompany.setName(dto.getName());
+        existingCompany.setAddress(dto.getAddress());
+        existingCompany.setRevenue(dto.getRevenue());
+    }
+}package main.mapper;
+
+import main.dto.VehicleDTO;
+import main.entity.Vehicle;
+
+public class VehicleMapper {
+
+    public static VehicleDTO toDTO(Vehicle vehicle) {
+        return new VehicleDTO(
+                vehicle.getType(),
+                vehicle.getCapacity(),
+                vehicle.getRegistrationNumber(),
+                vehicle.getRequiredQualification()
+        );
+    }
+
+    public static Vehicle toEntity(VehicleDTO dto) {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setType(dto.getType());
+        vehicle.setCapacity(dto.getCapacity());
+        vehicle.setRegistrationNumber(dto.getRegistrationNumber());
+        vehicle.setRequiredQualification(dto.getRequiredQualification());
+        return vehicle;
+    }
+
+    public static void updateEntityFromDTO(VehicleDTO dto, Vehicle vehicle) {
+            vehicle.setType(dto.getType());
+            vehicle.setCapacity(dto.getCapacity());
+            vehicle.setRegistrationNumber(dto.getRegistrationNumber());
+            vehicle.setRequiredQualification(dto.getRequiredQualification());
+    }
+}package main.mapper;
+
+import main.dto.TransportDTO;
+import main.entity.Transport;
+
+public class TransportMapper {
+
+    // Метод за преобразуване от Transport към TransportDTO
+    public static TransportDTO toDTO(Transport transport) {
+        if (transport == null) {
+            return null;
+        }
+
+        return new TransportDTO(
+                transport.getStartLocation(),
+                transport.getEndLocation(),
+                transport.getDepartureDate(),
+                transport.getArrivalDate(),
+                transport.getCargoDescription(),
+                transport.getCargoWeight(),
+                transport.getPrice(),
+                transport.isPaid()
+        );
+    }
+
+    // Метод за преобразуване от TransportDTO към Transport
+    public static Transport toEntity(TransportDTO transportDTO) {
+        if (transportDTO == null) {
+            return null;
+        }
+
+        Transport transport = new Transport();
+        transport.setStartLocation(transportDTO.getStartLocation());
+        transport.setEndLocation(transportDTO.getEndLocation());
+        transport.setDepartureDate(transportDTO.getDepartureDate());
+        transport.setArrivalDate(transportDTO.getArrivalDate());
+        transport.setCargoDescription(transportDTO.getCargoDescription());
+        transport.setCargoWeight(transportDTO.getCargoWeight());
+        transport.setPrice(transportDTO.getPrice());
+        transport.setPaid(transportDTO.isPaid());
+
+        return transport;
+    }
+
+    public static void updateEntityFromDTO(TransportDTO transportDTO, Transport transport) {
+        transport.setStartLocation(transportDTO.getStartLocation());
+        transport.setEndLocation(transportDTO.getEndLocation());
+        transport.setDepartureDate(transportDTO.getDepartureDate());
+        transport.setArrivalDate(transportDTO.getArrivalDate());
+        transport.setCargoDescription(transportDTO.getCargoDescription());
+        transport.setCargoWeight(transportDTO.getCargoWeight());
+        transport.setPrice(transportDTO.getPrice());
+        transport.setPaid(transportDTO.isPaid());
+
+    }
+}package main.mapper;
+
+import main.dto.ClientDTO;
+import main.entity.Client;
+
+
+public class ClientMapper {
+
+    // Преобразуване от Entity към DTO
+    public static ClientDTO toDTO(Client client) {
+        return new ClientDTO(
+                client.getName(),
+                client.getContactInfo()
+        );
+    }
+
+    // Преобразуване от DTO към Entity
+    public static Client toEntity(ClientDTO dto){
+        Client client = new Client();
+        client.setName(dto.getName());
+        client.setContactInfo(dto.getContactInfo());
+        return client;
+    }
+
+    public static void updateEntityFromDTO(ClientDTO dto, Client existingClient) {
+        existingClient.setName(dto.getName());
+        existingClient.setContactInfo(dto.getContactInfo());
+    }
+}package main.mapper;
+
+import main.dto.EmployeeDTO;
+import main.entity.Employee;
+
+public class EmployeeMapper {
+
+    public static EmployeeDTO toDTO(Employee employee) {
+        return new EmployeeDTO(
+                employee.getName(),
+                employee.getQualification(),
+                employee.getSalary()
+        );
+    }
+
+    public static Employee toEntity(EmployeeDTO dto) {
+        Employee employee = new Employee();
+        employee.setName(dto.getName());
+        employee.setQualification(dto.getQualification());
+        employee.setSalary(dto.getSalary());
+        return employee;
+    }
+
+    public static void updateEntityFromDTO(EmployeeDTO dto, Employee existingEmployee) {
+        existingEmployee.setName(dto.getName());
+        existingEmployee.setQualification(dto.getQualification());
+        existingEmployee.setSalary(dto.getSalary());
+    }
+}package main;
+
+import main.dao.*;
+import main.dto.*;
+import main.entity.*;
+import java.time.LocalDate;
+import java.util.*;
+import java.math.BigDecimal;
+
+public class Main {
+    public static void main(String[] args) {
+
+        try {
+            CompanyDTO companyDTO = new CompanyDTO("Delta Transports", "Sofia, Bulgaria", BigDecimal.valueOf(10000));
+            CompanyDAO companyDAO = new CompanyDAO();
+            Long companyId = companyDAO.createCompany(companyDTO);
+            System.out.println("\n=== Created Company ===");
+            System.out.println("Company Name: " + companyDTO.getName());
+            System.out.println("Company Address: " + companyDTO.getAddress());
+            System.out.println("Company Revenue: " + companyDTO.getRevenue());
+            System.out.println("Company ID: " + companyId);
+            System.out.println("=========================\n");
+
+            ClientDTO clientDTO = new ClientDTO("Stefan", "Stefan@example.com");
+            ClientDAO clientDAO = new ClientDAO();
+            Long clientId = clientDAO.createClient(clientDTO, companyId);
+            System.out.println("\n=== Created Client ===");
+            System.out.println("Client Name: " + clientDTO.getName());
+            System.out.println("Client Contact Info: " + clientDTO.getContactInfo());
+            System.out.println("Client ID: " + clientId);
+            System.out.println("=========================\n");
+
+            EmployeeDTO employeeDTO = new EmployeeDTO("G. Petrov", Set.of(Qualification.PASSENGERS_12_PLUS), 2000);
+            EmployeeDAO employeeDAO = new EmployeeDAO();
+            Long employeeId = employeeDAO.createEmployee(employeeDTO, companyId);
+            System.out.println("\n=== Created Employee ===");
+            System.out.println("Employee Name: " + employeeDTO.getName());
+            System.out.println("Employee Qualifications: " + employeeDTO.getQualification());
+            System.out.println("Employee Salary: " + employeeDTO.getSalary());
+            System.out.println("Employee ID: " + employeeId);
+            System.out.println("=========================\n");
+
+            VehicleDTO vehicleDTO = new VehicleDTO(VehicleType.VAN, 4, "SF4895AB", null);
+            VehicleDAO vehicleDAO = new VehicleDAO();
+            Long vehicleId = vehicleDAO.createVehicle(vehicleDTO, companyId);
+            System.out.println("\n=== Created Vehicle ===");
+            System.out.println("Vehicle Type: " + vehicleDTO.getType());
+            System.out.println("Vehicle Registration Number: " + vehicleDTO.getRegistrationNumber());
+            System.out.println("Vehicle Capacity: " + vehicleDTO.getCapacity());
+            System.out.println("Vehicle Qualification: " + vehicleDTO.getRequiredQualification());
+            System.out.println("Vehicle ID: " + vehicleId);
+            System.out.println("=========================\n");
+
+            TransportDTO transportDTO = new TransportDTO(
+                    "Sofia", "Varna", LocalDate.of(2024, 12, 24),
+                    LocalDate.of(2024, 12, 25), "Table",
+                    20, 20000, true
+            );
+
+            TransportDAO transportDAO = new TransportDAO();
+            transportDAO.createTransport(transportDTO, companyId, clientId, employeeId, vehicleId);
+
+            System.out.println("\n=== Created Transport ===");
+            System.out.println("Start Location: " + transportDTO.getStartLocation());
+            System.out.println("End Location: " + transportDTO.getEndLocation());
+            System.out.println("Departure Date: " + transportDTO.getDepartureDate());
+            System.out.println("Arrival Date: " + transportDTO.getArrivalDate());
+            System.out.println("Cargo Description: " + transportDTO.getCargoDescription());
+            System.out.println("Cargo Weight: " + transportDTO.getCargoWeight());
+            System.out.println("Price: " + transportDTO.getPrice());
+            System.out.println("Paid: " + transportDTO.isPaid());
+            System.out.println("=========================\n");
+
+            System.out.println("getTotalTransportsByCompanyInRange\n: "
+                    + companyDAO.getTotalTransportsByCompanyInRange(companyId,
+                    LocalDate.of(2025, 01, 01),
+                    LocalDate.of(2025, 01, 31)));
+
+            System.out.println("getTotalRevenueByCompanyInRange\n: "
+                    + companyDAO.getTotalRevenueByCompanyInRange(companyId,
+                    LocalDate.of(2025, 01, 01),
+                    LocalDate.of(2025, 01, 31)));
+
+            System.out.println("\n=== Transport ===");
+            System.out.println("Total Revenue: " + transportDAO.getTotalRevenue());
+            System.out.println("Total Revenue By Driver: " + transportDAO.getTotalRevenueByDriver(employeeId));
+            System.out.println("=========================\n");
+
+           // CompanyDAO companyDAO = new CompanyDAO();
+            companyDAO.saveCompanyReportToFile(389L, "src/main/java/main/reports/", "2024-01-12", "2025-01-31");
+
+            /*
+            System.out.println("Total profit for the company: " + companyDAO.getTotalProfitByCompany(383L));
+            Map<String, Object> companyReport = companyDAO.getCompanyReport(383L);
+
+            System.out.println("Total Revenue: " + companyReport.get("totalRevenue"));
+            System.out.println("Total Transports: " + companyReport.get("totalTransports"));
+            System.out.println("Vehicles: " + companyReport.get("vehicles"));
+            System.out.println("Clients: " + companyReport.get("clients"));
+            System.out.println("Employees: " + companyReport.get("employees"));
+             */
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}

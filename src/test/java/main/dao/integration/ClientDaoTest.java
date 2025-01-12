@@ -5,6 +5,7 @@ import main.dao.ClientDAO;
 import main.dao.CompanyDAO;
 import main.dto.ClientDTO;
 import main.dto.CompanyDTO;
+import main.exception.EntityNotFoundException;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.junit.jupiter.api.*;
@@ -31,8 +32,8 @@ public class ClientDaoTest {
     void cleanUp() {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             session.beginTransaction();
-            session.createQuery("delete from Client").executeUpdate();
-            session.createQuery("delete from Company").executeUpdate();
+            session.createQuery("DELETE FROM Client").executeUpdate();
+            session.createQuery("DELETE FROM Company").executeUpdate();
             session.getTransaction().commit();
         }
     }
@@ -54,7 +55,7 @@ public class ClientDaoTest {
 
     @Test
     public void testGetClient_NotFound() {
-        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+        Exception exception = assertThrows(EntityNotFoundException.class, () -> {
             clientDAO.getClient(999L);
         });
         assertEquals("Client with ID 999 does not exist or is deleted.", exception.getMessage());
@@ -86,7 +87,7 @@ public class ClientDaoTest {
 
         clientDAO.deleteClient(clientId);
 
-        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+        Exception exception = assertThrows(EntityNotFoundException.class, () -> {
             clientDAO.getClient(clientId);
         });
         assertEquals("Client with ID " + clientId + " does not exist or is deleted.", exception.getMessage());
