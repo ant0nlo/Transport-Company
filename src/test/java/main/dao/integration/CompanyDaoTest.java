@@ -212,11 +212,12 @@ public class CompanyDaoTest {
     }
 
     @Test
-    public void testGetTotalRevenueByCompany_NoTransports() {
+    public void testGetTotalTransportsByCompany() {
         CompanyDTO companyDTO = new CompanyDTO("Company A", "Sofia, Bulgaria", BigDecimal.valueOf(100000));
         Long companyId = companyDAO.createCompany(companyDTO);
 
-        double totalRevenue = companyDAO.getTotalRevenueByCompany(companyId);
+        double totalRevenue = companyDAO.getTotalTransportsByCompany(companyId);
+
         assertEquals(0.0, totalRevenue);
     }
 

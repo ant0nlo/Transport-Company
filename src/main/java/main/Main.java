@@ -11,8 +11,7 @@ public class Main {
     public static void main(String[] args) {
 
         try {
-/*
-            CompanyDTO companyDTO = new CompanyDTO("EHL", "Sofia, Bulgaria", BigDecimal.valueOf(10000));
+            CompanyDTO companyDTO = new CompanyDTO("Delta Transports", "Sofia, Bulgaria", BigDecimal.valueOf(10000));
             CompanyDAO companyDAO = new CompanyDAO();
             Long companyId = companyDAO.createCompany(companyDTO);
             System.out.println("\n=== Created Company ===");
@@ -41,7 +40,7 @@ public class Main {
             System.out.println("Employee ID: " + employeeId);
             System.out.println("=========================\n");
 
-            VehicleDTO vehicleDTO = new VehicleDTO(VehicleType.VAN, 4, "SF4893AB", null);
+            VehicleDTO vehicleDTO = new VehicleDTO(VehicleType.VAN, 4, "SF4895AB", null);
             VehicleDAO vehicleDAO = new VehicleDAO();
             Long vehicleId = vehicleDAO.createVehicle(vehicleDTO, companyId);
             System.out.println("\n=== Created Vehicle ===");
@@ -87,10 +86,10 @@ public class Main {
             System.out.println("Total Revenue By Driver: " + transportDAO.getTotalRevenueByDriver(employeeId));
             System.out.println("=========================\n");
 
+           // CompanyDAO companyDAO = new CompanyDAO();
+            companyDAO.saveCompanyReportToFile(389L, "src/main/java/main/reports/", "2024-01-12", "2025-01-31");
 
- */
-            CompanyDAO companyDAO = new CompanyDAO();
-
+            /*
             System.out.println("Total profit for the company: " + companyDAO.getTotalProfitByCompany(383L));
             Map<String, Object> companyReport = companyDAO.getCompanyReport(383L);
 
@@ -99,14 +98,10 @@ public class Main {
             System.out.println("Vehicles: " + companyReport.get("vehicles"));
             System.out.println("Clients: " + companyReport.get("clients"));
             System.out.println("Employees: " + companyReport.get("employees"));
-
-            companyDAO.saveCompanyReportToFile(388L, "src/main/java/main/reports/", "2025-01-01", "2025-01-31");
-
-
+             */
 
         } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 }

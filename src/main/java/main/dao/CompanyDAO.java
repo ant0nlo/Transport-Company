@@ -247,7 +247,8 @@ public class CompanyDAO {
         }
     }
 
-    public double getTotalProfitByCompany(Long companyId) {
+   /*
+   public double getTotalProfitByCompany(Long companyId) {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             // 1) Взимаме самата компания от базата, за да получим initialInvestment
             Company company = session.get(Company.class, companyId);
@@ -323,6 +324,7 @@ public class CompanyDAO {
 
         return report;
     }
+    */
 
     public void saveCompanyReportToFile(Long companyId, String directoryPath, String startDateStr, String endDateStr) {
         File directory = new File(directoryPath);
@@ -330,12 +332,12 @@ public class CompanyDAO {
             throw new IllegalArgumentException("The path: " + directoryPath + " does not exist.");
         }
 
-        // 1) Парсираме входните дати (очакваме формат "yyyy-MM-dd")
+        // 1) Парсираме входните дати
         LocalDate startDate;
         LocalDate endDate;
         try {
-            startDate = LocalDate.parse(startDateStr); // напр. "2024-12-01"
-            endDate = LocalDate.parse(endDateStr);   // напр. "2024-12-31"
+            startDate = LocalDate.parse(startDateStr);
+            endDate = LocalDate.parse(endDateStr);
         } finally {
 
         }
@@ -347,8 +349,7 @@ public class CompanyDAO {
         // 3) Взимаме CompanyDTO, за да покажем име на компанията
         CompanyDTO companyDTO = getCompanyById(companyId);
 
-        // 4) Взимаме обектите (Vehicles, Clients, Employees), които НЕ филтрираме по дати
-        //    (ако желаете, може и там да има филтрация, но най-често те не са зависими от период).
+        // 4) Взимаме обектите (Vehicles, Clients, Employees)
         Set<VehicleDTO> vehicles = getCompanyVehicles(companyId);
         Set<ClientDTO> clients   = getCompanyClients(companyId);
         Set<EmployeeDTO> employees = getCompanyEmployees(companyId);
@@ -408,7 +409,7 @@ public class CompanyDAO {
             writer.newLine();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Error processing file", e);
         }
     }
 
